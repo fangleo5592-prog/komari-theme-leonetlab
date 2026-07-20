@@ -33,7 +33,7 @@ const sitename = computed(() => appStore.publicSettings?.sitename || 'Komari Mon
 
 <template>
   <header class="lnl-header" :class="{ 'is-scrolled': isScrolled }">
-    <div class="lnl-header-inner max-w-[1440px] mx-auto">
+    <div class="lnl-header-inner max-w-[1680px] mx-auto">
       <button class="lnl-identity" type="button" aria-label="返回监控总览" @click="router.push('/')">
         <span class="lnl-identity-mark"><img src="/images/logo/leonetlab.png" alt=""></span>
         <span class="lnl-identity-copy">

@@ -33,6 +33,7 @@ coverage
 .eslintcache
 .chrome-*
 docs/audit-*.png
+docs/audit-*/
 docs/chrome-smoke.png
 
 .env.development

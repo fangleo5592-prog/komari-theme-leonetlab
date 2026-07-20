@@ -22,11 +22,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <VisitorInfoCard v-if="appStore.visitorInfoCardEnabled" />
-  <footer class="lnl-footer max-w-[1440px] mx-auto">
+  <footer class="lnl-footer max-w-[1680px] mx-auto">
     <div class="lnl-footer-rule">
       <span>EDGE / OBSERVATION COMPLETE</span><i />
     </div>
+    <VisitorInfoCard v-if="appStore.visitorInfoCardEnabled" />
     <div class="lnl-footer-meta">
       <p>
         <a href="https://github.com/komari-monitor/komari" target="_blank" rel="noopener noreferrer">Powered by Komari Monitor.</a>

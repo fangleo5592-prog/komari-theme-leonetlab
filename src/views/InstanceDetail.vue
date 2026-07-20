@@ -239,7 +239,7 @@ const trafficProgressStyle = computed(() => ({
 </script>
 
 <template>
-  <div class="instance-detail space-y-4">
+  <div class="instance-detail lnl-detail space-y-5">
     <div v-if="!data" class="p-4">
       <CardX
         class="border-none transition-all rounded-md"
@@ -256,7 +256,7 @@ const trafficProgressStyle = computed(() => ({
     </div>
 
     <template v-else>
-      <div class="px-4 flex gap-4 items-center">
+      <div class="lnl-detail-hero px-4 flex gap-4 items-center">
         <Button variant="ghost" size="icon-sm" class="bg-background/50 hover:bg-background" @click="router.push('/')">
           <Icon icon="tabler:arrow-left" :width="16" :height="16" />
         </Button>
@@ -272,10 +272,10 @@ const trafficProgressStyle = computed(() => ({
         </Badge>
       </div>
 
-      <div class="px-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div class="lnl-detail-metrics px-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <CardX
           v-for="item in metricCards" :key="item.label" hoverable size="small"
-          class="group h-full border-none transition-all rounded-md"
+          class="lnl-detail-metric group h-full border-none transition-all rounded-md"
           :class="pickSurfaceClass('bg-background/60 hover:bg-background', 'bg-background/50 hover:bg-background backdrop-blur-xs')"
           content-class="h-full !p-3"
         >
@@ -302,16 +302,16 @@ const trafficProgressStyle = computed(() => ({
         </CardX>
       </div>
 
-      <div class="px-4 gap-4 grid grid-cols-1 lg:grid-cols-2">
+      <div class="lnl-detail-info-grid px-4 gap-4 grid grid-cols-1 lg:grid-cols-2">
         <CardX
           title="硬件信息" size="small"
-          class="group h-full border-none transition-all rounded-md"
+          class="lnl-detail-panel group h-full border-none transition-all rounded-md"
           :class="pickSurfaceClass('bg-background/60 hover:bg-background', 'bg-background/50 hover:bg-background backdrop-blur-xs')"
         >
           <div class="gap-3 grid grid-cols-3">
             <div
               v-for="(item, index) in hardwareInfo" :key="item.label"
-              class="min-w-0 flex flex-col gap-1 rounded-sm bg-slate-500/5 p-2" :class="!index && 'col-span-3'"
+              class="lnl-detail-field min-w-0 flex flex-col gap-1 rounded-sm bg-slate-500/5 p-2" :class="!index && 'col-span-3'"
             >
               <div class="flex gap-1 items-center text-muted-foreground">
                 <Icon v-if="item.icon" :icon="item.icon" :width="14" :height="14" />
@@ -324,13 +324,13 @@ const trafficProgressStyle = computed(() => ({
 
         <CardX
           title="系统信息" size="small"
-          class="group h-full border-none transition-all rounded-md"
+          class="lnl-detail-panel group h-full border-none transition-all rounded-md"
           :class="pickSurfaceClass('bg-background/60 hover:bg-background', 'bg-background/50 hover:bg-background backdrop-blur-xs')"
         >
           <div class="gap-3 grid grid-cols-1 sm:grid-cols-2">
             <div
               v-for="item in systemInfo" :key="item.label"
-              class="min-w-0 flex flex-col gap-1 rounded-sm bg-slate-500/5 p-2"
+              class="lnl-detail-field min-w-0 flex flex-col gap-1 rounded-sm bg-slate-500/5 p-2"
             >
               <div class="flex gap-1 items-center text-muted-foreground">
                 <Icon v-if="item.icon" :icon="item.icon" :width="14" :height="14" />
@@ -351,13 +351,13 @@ const trafficProgressStyle = computed(() => ({
 
         <CardX
           title="存储信息" size="small"
-          class="group h-full border-none transition-all rounded-md"
+          class="lnl-detail-panel group h-full border-none transition-all rounded-md"
           :class="pickSurfaceClass('bg-background/60 hover:bg-background', 'bg-background/50 hover:bg-background backdrop-blur-xs')"
         >
           <div class="gap-3 grid grid-cols-3">
             <div
               v-for="item in storageInfo" :key="item.label"
-              class="min-w-0 flex flex-col gap-1 rounded-sm bg-slate-500/5 p-2"
+              class="lnl-detail-field min-w-0 flex flex-col gap-1 rounded-sm bg-slate-500/5 p-2"
             >
               <div class="flex gap-1 items-center text-muted-foreground">
                 <Icon v-if="item.icon" :icon="item.icon" :width="14" :height="14" />
@@ -370,12 +370,12 @@ const trafficProgressStyle = computed(() => ({
 
         <CardX
           title="网络信息" size="small"
-          class="group h-full border-none transition-all rounded-md"
+          class="lnl-detail-panel group h-full border-none transition-all rounded-md"
           :class="pickSurfaceClass('bg-background/60 hover:bg-background', 'bg-background/50 hover:bg-background backdrop-blur-xs')"
           content-class="pt-0"
         >
           <div class="gap-3 grid grid-cols-2">
-            <div class="relative min-w-0 overflow-hidden rounded-sm bg-slate-500/5 p-2">
+            <div class="lnl-detail-field relative min-w-0 overflow-hidden rounded-sm bg-slate-500/5 p-2">
               <div
                 v-if="hasTrafficLimit"
                 class="absolute inset-y-0 left-0 rounded-sm bg-primary/10 pointer-events-none transition-[width] duration-300 ease-out"
@@ -394,7 +394,7 @@ const trafficProgressStyle = computed(() => ({
                 </span>
               </div>
             </div>
-            <div class="min-w-0 flex flex-col gap-1 rounded-sm bg-slate-500/5 p-2">
+            <div class="lnl-detail-field min-w-0 flex flex-col gap-1 rounded-sm bg-slate-500/5 p-2">
               <div class="flex gap-1 items-center text-muted-foreground">
                 <Icon icon="icon-park-outline:dashboard-one" :width="14" :height="14" />
                 <span class="text-xs sm:text-sm">网络速率</span>
@@ -411,8 +411,8 @@ const trafficProgressStyle = computed(() => ({
         </CardX>
       </div>
 
-      <LoadChart :uuid="data.uuid" class="px-4" />
-      <PingChart :uuid="data.uuid" class="px-4" />
+      <LoadChart :uuid="data.uuid" class="lnl-detail-chart px-4" />
+      <PingChart :uuid="data.uuid" class="lnl-detail-chart px-4" />
     </template>
   </div>
 </template>

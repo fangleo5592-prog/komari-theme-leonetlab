@@ -394,20 +394,18 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="pointer-events-none fixed inset-x-0 bottom-2.5 z-30 flex justify-center">
-    <div
-      class="pointer-events-auto cursor-default p-1.5 px-3 shadow-[-1px_-1px_0_background,0_0_16px_rgba(0,0,0,0.05)] transition-[border-radius,transform,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] bg-background/30 backdrop-blur-sm"
-      :class="[
-        expand
-          ? 'rounded-lg -translate-y-1 bg-background/38 shadow-[-1px_-1px_0_background,0_10px_28px_rgba(0,0,0,0.08)]'
-          : 'rounded-xl',
-      ]"
+  <aside class="lnl-visitor" aria-label="访客网络信息">
+    <button
+      type="button"
+      class="lnl-visitor-trigger"
+      :class="{ 'is-expanded': expand }"
+      :aria-expanded="expand"
       @click="expand = !expand"
     >
       <TransitionGroup
         tag="div"
         name="visitor-pill"
-        class="transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        class="lnl-visitor-rows transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
         :class="[expand ? 'grid grid-cols-2 items-start justify-start gap-x-3 gap-y-2' : 'flex flex-nowrap items-center justify-center gap-x-3 gap-y-1']"
       >
         <div
@@ -436,11 +434,62 @@ onMounted(async () => {
           </div>
         </div>
       </TransitionGroup>
-    </div>
-  </div>
+      <span class="lnl-visitor-action" aria-hidden="true">
+        {{ expand ? '收起' : '详情' }}
+        <Icon :icon="expand ? 'tabler:chevron-up' : 'tabler:chevron-down'" :width="13" :height="13" />
+      </span>
+    </button>
+  </aside>
 </template>
 
 <style scoped>
+.lnl-visitor {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.lnl-visitor-trigger {
+  display: flex;
+  max-width: min(100%, 920px);
+  align-items: center;
+  gap: 14px;
+  padding: 9px 11px 9px 13px;
+  border: 1px solid var(--lnl-line);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--lnl-surface) 82%, transparent);
+  color: inherit;
+  text-align: left;
+  transition:
+    border-color 240ms ease,
+    background-color 240ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lnl-visitor-trigger:hover,
+.lnl-visitor-trigger:focus-visible,
+.lnl-visitor-trigger.is-expanded {
+  border-color: color-mix(in srgb, var(--lnl-green) 48%, var(--lnl-line));
+  background: color-mix(in srgb, var(--lnl-surface) 94%, transparent);
+}
+
+.lnl-visitor-trigger:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--lnl-green) 45%, transparent);
+  outline-offset: 3px;
+}
+
+.lnl-visitor-action {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  padding-left: 10px;
+  border-left: 1px solid var(--lnl-line);
+  color: var(--lnl-green);
+  font: 9px var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
 .visitor-pill-enter-active,
 .visitor-pill-leave-active,
 .visitor-pill-move {
@@ -463,10 +512,30 @@ onMounted(async () => {
   position: absolute;
 }
 
+@media (max-width: 760px) {
+  .lnl-visitor,
+  .lnl-visitor-trigger {
+    width: 100%;
+  }
+
+  .lnl-visitor-trigger {
+    align-items: flex-start;
+  }
+
+  .lnl-visitor-rows {
+    flex: 1;
+    justify-content: flex-start !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .visitor-pill-enter-active,
   .visitor-pill-leave-active,
   .visitor-pill-move {
+    transition: none;
+  }
+
+  .lnl-visitor-trigger {
     transition: none;
   }
 

@@ -177,6 +177,7 @@ textarea {
 
 .lnl-shell {
   position: relative;
+  z-index: 1;
   width: 100%;
 }
 .lnl-header {
@@ -227,7 +228,7 @@ textarea {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
 }
 .lnl-identity-copy {
   min-width: 0;
@@ -285,7 +286,7 @@ textarea {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 36px;
   align-items: end;
-  margin: clamp(34px, 5vw, 72px) clamp(16px, 3vw, 44px) 20px;
+  margin: clamp(32px, 4vw, 64px) clamp(16px, 2.25vw, 36px) 22px;
   padding-bottom: 26px;
   border-bottom: 1px solid var(--lnl-line);
 }
@@ -341,8 +342,8 @@ textarea {
 .home-view > .p-4,
 .home-view > .node-info,
 .home-view > .alert {
-  padding-right: clamp(16px, 3vw, 44px);
-  padding-left: clamp(16px, 3vw, 44px);
+  padding-right: clamp(16px, 2.25vw, 36px);
+  padding-left: clamp(16px, 2.25vw, 36px);
 }
 .home-view .node-info {
   gap: 22px;
@@ -377,7 +378,7 @@ textarea {
 .node-card:hover {
   z-index: 2;
   border-color: color-mix(in srgb, var(--lnl-green) 48%, transparent) !important;
-  transform: translateY(-4px) !important;
+  transform: translateY(-2px) !important;
 }
 .node-card:hover::before {
   opacity: 1;
@@ -390,6 +391,18 @@ textarea {
 }
 .node-card [class*='text-[11px]'] {
   font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.node-card .text-xs,
+.node-info .text-xs {
+  font-size: 13px;
+}
+.node-card > div > div {
+  position: relative;
+}
+.node-card > div > div + div {
+  border-top: 1px solid color-mix(in srgb, var(--lnl-line) 58%, transparent);
 }
 .node-info input {
   border-radius: 0;
@@ -414,9 +427,8 @@ textarea {
 
 .lnl-page-enter-active {
   transition:
-    opacity 0.42s ease,
-    transform 0.52s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.42s ease;
+    opacity 0.32s ease,
+    transform 0.44s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .lnl-page-leave-active {
   transition:
@@ -425,8 +437,7 @@ textarea {
 }
 .lnl-page-enter-from {
   opacity: 0;
-  transform: translate3d(0, 12px, 0);
-  filter: blur(3px);
+  transform: translate3d(0, 9px, 0);
 }
 .lnl-page-leave-to {
   opacity: 0;
@@ -436,11 +447,65 @@ textarea {
 .lnl-page-leave-from {
   opacity: 1;
   transform: none;
-  filter: none;
+}
+
+.lnl-detail {
+  padding-top: clamp(20px, 3.2vw, 44px);
+}
+.lnl-detail-hero {
+  min-height: 54px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--lnl-line);
+}
+.lnl-detail-hero > div {
+  font-family: var(--font-display);
+  font-size: clamp(19px, 1.45vw, 24px);
+  font-weight: 400;
+}
+.lnl-detail-metric,
+.lnl-detail-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--lnl-line) !important;
+  border-radius: 0 !important;
+  background: color-mix(in srgb, var(--lnl-surface) 88%, transparent) !important;
+  box-shadow: none !important;
+}
+.lnl-detail-metric::before,
+.lnl-detail-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 34px;
+  height: 1px;
+  background: var(--lnl-green);
+}
+.lnl-detail-panel > div:first-child:not(:only-child) {
+  border-bottom: 1px solid color-mix(in srgb, var(--lnl-line) 72%, transparent);
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+.lnl-detail-field {
+  min-height: 60px;
+  padding: 10px 11px !important;
+  border: 1px solid color-mix(in srgb, var(--lnl-line) 54%, transparent);
+  border-radius: 0 !important;
+  background: color-mix(in srgb, var(--lnl-surface) 58%, transparent) !important;
+}
+.lnl-detail-field .text-xs,
+.lnl-detail-metric .text-xs {
+  font-size: 13px;
+}
+.lnl-detail-chart {
+  margin-top: 8px;
+  padding-top: 22px;
+  border-top: 1px solid var(--lnl-line);
 }
 
 .lnl-footer {
-  padding: 64px clamp(16px, 3vw, 44px) max(28px, env(safe-area-inset-bottom));
+  position: relative;
+  z-index: 1;
+  padding: 64px clamp(16px, 2.25vw, 36px) max(28px, env(safe-area-inset-bottom));
   color: var(--muted-foreground);
 }
 .lnl-footer-rule {
@@ -461,7 +526,7 @@ textarea {
   justify-content: space-between;
   gap: 24px;
   margin-top: 18px;
-  font: 11px/1.65 var(--font-mono);
+  font: 12px/1.65 var(--font-mono);
 }
 .lnl-footer-meta p {
   margin: 0;
@@ -535,6 +600,19 @@ textarea {
   .lnl-footer {
     padding-top: 48px;
   }
+  .lnl-detail {
+    padding-top: 16px;
+  }
+  .lnl-detail-hero,
+  .lnl-detail-metrics,
+  .lnl-detail-info-grid,
+  .lnl-detail-chart {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+  .lnl-detail-field {
+    min-height: 56px;
+  }
   .node-card:hover {
     transform: none !important;
   }
@@ -561,6 +639,5 @@ textarea {
   .lnl-page-leave-to {
     opacity: 1;
     transform: none;
-    filter: none;
   }
 }

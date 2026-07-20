@@ -55,7 +55,7 @@ onUnmounted(() => {
     <LoadingCover v-if="showLaunch" />
     <Header />
     <main v-if="!appStore.loading" class="flex-1">
-      <div class="lnl-shell max-w-[1440px] mx-auto">
+      <div class="lnl-shell max-w-[1680px] mx-auto">
         <RouterView v-slot="{ Component }">
           <Transition v-bind="pageTransitionProps">
             <KeepAlive :include="['HomeView']">

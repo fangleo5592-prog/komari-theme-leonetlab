@@ -138,6 +138,7 @@ onUnmounted(() => {
         <div class="lnl-background-grid" />
         <div class="lnl-background-signal s1" />
         <div class="lnl-background-signal s2" />
+        <div class="lnl-background-depth" />
         <div class="lnl-background-ocean" />
       </div>
     </Transition>
@@ -178,8 +179,9 @@ onUnmounted(() => {
 .background-container {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   overflow: hidden;
+  pointer-events: none;
 }
 
 .lnl-background {
@@ -229,13 +231,38 @@ onUnmounted(() => {
   bottom: -27%;
   left: -8%;
   height: 58%;
-  opacity: 0.17;
-  background-image: radial-gradient(circle, rgba(116, 230, 178, 0.62) 0 1px, transparent 1.2px);
+  opacity: 0.27;
+  background-image:
+    radial-gradient(circle, rgba(116, 230, 178, 0.78) 0 1px, transparent 1.25px),
+    radial-gradient(circle, rgba(117, 201, 212, 0.35) 0 0.8px, transparent 1px);
+  background-position:
+    0 0,
+    14px 11px;
   background-size: 28px 22px;
   transform: perspective(680px) rotateX(64deg);
   transform-origin: 50% 0;
   mask-image: linear-gradient(transparent, #000 20%, transparent 93%);
   animation: ocean-drift 16s ease-in-out infinite alternate;
+}
+
+.lnl-background-depth {
+  position: absolute;
+  inset: 14% -12% auto;
+  height: 42%;
+  opacity: 0.2;
+  background-image: radial-gradient(circle, rgba(117, 201, 212, 0.52) 0 0.8px, transparent 1px);
+  background-size: 36px 30px;
+  mask-image: radial-gradient(ellipse at 70% 40%, #000 0 8%, transparent 70%);
+  transform: perspective(760px) rotateX(68deg) rotateZ(-2deg);
+  animation: depth-drift 22s linear infinite;
+}
+
+.lnl-background-ocean::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 35%, rgba(116, 230, 178, 0.13), transparent 65%);
+  animation: ocean-scan 9s ease-in-out infinite;
 }
 
 @keyframes signal-drift {
@@ -246,6 +273,25 @@ onUnmounted(() => {
 @keyframes ocean-drift {
   to {
     transform: perspective(680px) rotateX(64deg) translate3d(1.5%, -2.5%, 0);
+  }
+}
+@keyframes depth-drift {
+  to {
+    background-position: 36px 30px;
+  }
+}
+@keyframes ocean-scan {
+  0%,
+  100% {
+    translate: -42% 0;
+    opacity: 0;
+  }
+  45%,
+  60% {
+    opacity: 1;
+  }
+  70% {
+    translate: 42% 0;
   }
 }
 
@@ -294,6 +340,8 @@ onUnmounted(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .lnl-background-signal,
+  .lnl-background-depth,
+  .lnl-background-ocean::before,
   .lnl-background-ocean {
     animation: none;
   }

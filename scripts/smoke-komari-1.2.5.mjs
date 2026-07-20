@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { extname, resolve, sep } from 'node:path'
@@ -146,7 +146,8 @@ const server = createServer((request, response) => {
   }
 
   const requested = url.pathname === '/' ? 'index.html' : url.pathname.replace(leadingSlashesPattern, '')
-  const file = resolve(dist, requested)
+  const requestedFile = resolve(dist, requested)
+  const file = existsSync(requestedFile) ? requestedFile : resolve(dist, 'index.html')
   if (!file.startsWith(`${dist}${sep}`) || !existsSync(file)) {
     response.writeHead(404)
     response.end('Not found')
@@ -175,6 +176,37 @@ await new Promise((resolveListen, rejectListen) => {
 const address = server.address()
 assert.ok(address && typeof address === 'object')
 const profile = resolve(tmpdir(), `leonetlab-komari-smoke-${process.pid}`)
+
+async function captureScreenshot(name, width, height, path, virtualTimeBudget) {
+  const screenshotProfile = `${profile}-${name}`
+  const screenshotDir = process.env.SMOKE_SCREENSHOT_DIR
+  assert.ok(screenshotDir)
+  await new Promise((resolveRun, rejectRun) => {
+    const child = spawn(browser, [
+      '--headless=new',
+      '--disable-gpu',
+      '--hide-scrollbars',
+      '--no-first-run',
+      '--no-default-browser-check',
+      `--user-data-dir=${screenshotProfile}`,
+      `--window-size=${width},${height}`,
+      `--virtual-time-budget=${virtualTimeBudget}`,
+      `--screenshot=${resolve(screenshotDir, `${name}.png`)}`,
+      `http://127.0.0.1:${address.port}${path}`,
+    ], { windowsHide: true })
+    let stderr = ''
+    child.stderr.setEncoding('utf8')
+    child.stderr.on('data', chunk => stderr += chunk)
+    child.once('error', rejectRun)
+    child.once('close', (code) => {
+      rmSync(screenshotProfile, { recursive: true, force: true })
+      if (code === 0)
+        resolveRun()
+      else
+        rejectRun(new Error(`Screenshot browser exited with ${code}: ${stderr.slice(-800)}`))
+    })
+  })
+}
 
 try {
   const html = await new Promise((resolveRun, rejectRun) => {
@@ -207,6 +239,15 @@ try {
   assert.match(html, /Frankfurt Fixture/)
   assert.doesNotMatch(html, /暂无节点/)
   console.log('Komari 1.2.5 rendered-node integration smoke test passed.')
+
+  if (process.env.SMOKE_SCREENSHOT_DIR) {
+    mkdirSync(process.env.SMOKE_SCREENSHOT_DIR, { recursive: true })
+    await captureScreenshot('desktop-home', 1920, 1080, '/', 6000)
+    await captureScreenshot('desktop-detail', 1600, 1000, `/instance/${nodeUuid}`, 6000)
+    await captureScreenshot('mobile-intro', 390, 844, '/', 900)
+    await captureScreenshot('mobile-home', 390, 844, '/', 6000)
+    console.log(`Visual audit screenshots saved to ${process.env.SMOKE_SCREENSHOT_DIR}`)
+  }
 }
 finally {
   await new Promise(resolveClose => server.close(resolveClose))

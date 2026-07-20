@@ -1,13 +1,4 @@
 <script setup lang="ts">
-const viewportWidth = Math.max(320, document.documentElement.clientWidth || window.innerWidth)
-const viewportHeight = Math.max(480, window.innerHeight || document.documentElement.clientHeight)
-const globeSize = Math.round(Math.max(210, Math.min(480, viewportWidth * 0.46, viewportHeight * 0.48)))
-const titleSize = Math.round(Math.max(42, Math.min(78, viewportWidth * 0.07, viewportHeight * 0.085)))
-const introStyle = {
-  '--lnl-intro-globe': `${globeSize}px`,
-  '--lnl-intro-title': `${titleSize}px`,
-}
-
 const regions = [
   { code: 'HK', className: 'n1' },
   { code: 'JP', className: 'n2' },
@@ -21,7 +12,7 @@ const regions = [
 </script>
 
 <template>
-  <div class="lnl-intro" :style="introStyle" role="status" aria-live="polite" aria-label="正在连接监控数据">
+  <div class="lnl-intro" role="status" aria-live="polite" aria-label="正在连接监控数据">
     <div class="lnl-intro-grid" aria-hidden="true" />
     <div class="lnl-intro-top" aria-hidden="true">
       <span>LNL / MONITOR SESSION</span><span>08 REGIONS · EDGE READY</span>
@@ -64,6 +55,8 @@ const regions = [
 
 <style scoped>
 .lnl-intro {
+  --lnl-intro-globe: clamp(210px, min(46vw, 48dvh), 480px);
+  --lnl-intro-title: clamp(42px, min(7vw, 8.5dvh), 78px);
   position: fixed;
   inset: 0;
   z-index: 100;
@@ -289,6 +282,9 @@ const regions = [
 }
 .lnl-intro-core > span {
   width: 76px;
+  height: 76px;
+  box-sizing: border-box;
+  overflow: hidden;
   aspect-ratio: 1;
   padding: 7px;
   border: 1px solid rgba(116, 230, 178, 0.4);
@@ -303,7 +299,7 @@ const regions = [
   width: 100%;
   height: 100%;
   border-radius: 12px;
-  object-fit: cover;
+  object-fit: contain;
 }
 .lnl-intro-copy {
   display: grid;
@@ -423,6 +419,10 @@ const regions = [
   }
 }
 @media (max-width: 680px) {
+  .lnl-intro {
+    --lnl-intro-globe: clamp(190px, min(72vw, 43dvh), 330px);
+    --lnl-intro-title: clamp(40px, 13vw, 58px);
+  }
   .lnl-intro-top span:last-child,
   .lnl-intro-bottom span:last-child {
     display: none;
@@ -439,6 +439,7 @@ const regions = [
   }
   .lnl-intro-core > span {
     width: 62px;
+    height: 62px;
     padding: 6px;
     border-radius: 16px;
   }
