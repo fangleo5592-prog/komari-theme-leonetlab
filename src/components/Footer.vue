@@ -5,6 +5,11 @@ import VisitorInfoCard from '@/components/VisitorInfoCard.vue'
 import { useAppStore } from '@/stores/app'
 import { getSharedApi } from '@/utils/api'
 
+defineProps<{
+  introComplete: boolean
+  presentVisitor: boolean
+}>()
+
 const appStore = useAppStore()
 const serverVersion = ref<VersionInfo | null>(null)
 const showIcp = computed(() => appStore.icpEnabled && appStore.icpNumber)
@@ -22,7 +27,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <VisitorInfoCard v-if="appStore.visitorInfoCardEnabled" />
+  <VisitorInfoCard
+    v-if="appStore.visitorInfoCardEnabled"
+    :intro-complete="introComplete"
+    :present-on-ready="presentVisitor"
+  />
   <footer class="lnl-footer max-w-[1680px] mx-auto" :class="{ 'has-visitor': appStore.visitorInfoCardEnabled }">
     <div class="lnl-footer-rule">
       <span>EDGE / OBSERVATION COMPLETE</span><i />

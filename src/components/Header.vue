@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { computed, inject, ref } from 'vue'
+import { computed, inject, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { DataTooltip } from '@/components/ui/data-tooltip'
@@ -9,6 +9,10 @@ import { useAppStore } from '@/stores/app'
 const router = useRouter()
 const appStore = useAppStore()
 const isScrolled = inject<ReturnType<typeof ref<boolean>>>('isScrolled', ref(false))
+const themeTransition = ref<'light' | 'dark' | null>(null)
+const leavingForAdmin = ref(false)
+const transitionTimers: number[] = []
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const actionButtons = computed(() => {
   const buttons = [{
@@ -21,12 +25,52 @@ const actionButtons = computed(() => {
   return buttons
 })
 
+function toggleTheme() {
+  if (themeTransition.value)
+    return
+
+  const nextMode = appStore.themeMode === 'system'
+    ? 'light'
+    : appStore.themeMode === 'light'
+      ? 'dark'
+      : 'system'
+  const nextDark = nextMode === 'system'
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches
+    : nextMode === 'dark'
+
+  if (reducedMotion) {
+    appStore.updateThemeMode()
+    return
+  }
+
+  themeTransition.value = nextDark ? 'dark' : 'light'
+  transitionTimers.push(window.setTimeout(() => appStore.updateThemeMode(), 150))
+  transitionTimers.push(window.setTimeout(() => {
+    themeTransition.value = null
+  }, 720))
+}
+
+function jumpToSetting() {
+  if (leavingForAdmin.value)
+    return
+  if (reducedMotion) {
+    location.href = '/admin'
+    return
+  }
+  leavingForAdmin.value = true
+  transitionTimers.push(window.setTimeout(() => {
+    location.href = '/admin'
+  }, 620))
+}
+
 function handleButtonClick(action: string) {
   if (action === 'toggleTheme')
-    appStore.updateThemeMode()
+    toggleTheme()
   if (action === 'jumpToSetting')
-    location.href = '/admin'
+    jumpToSetting()
 }
+
+onUnmounted(() => transitionTimers.forEach(timer => window.clearTimeout(timer)))
 
 const sitename = computed(() => appStore.publicSettings?.sitename || 'Komari Monitor')
 </script>
@@ -53,4 +97,191 @@ const sitename = computed(() => appStore.publicSettings?.sitename || 'Komari Mon
       </nav>
     </div>
   </header>
+  <Teleport to="body">
+    <div
+      v-if="themeTransition"
+      class="lnl-theme-wipe"
+      :class="`to-${themeTransition}`"
+      aria-hidden="true"
+    />
+    <div v-if="leavingForAdmin" class="lnl-route-cover" role="status" aria-live="polite">
+      <div class="lnl-route-grid" aria-hidden="true" />
+      <div class="lnl-route-core" aria-hidden="true">
+        <i /><span><img src="/images/logo/leonetlab.png" alt=""></span><i />
+      </div>
+      <div class="lnl-route-copy">
+        <span>SECURE HANDOFF / LOCAL CONSOLE</span>
+        <strong>进入管理控制台</strong>
+        <p>正在交接当前会话</p>
+      </div>
+      <div class="lnl-route-track">
+        <i />
+      </div>
+    </div>
+  </Teleport>
 </template>
+
+<style scoped>
+.lnl-theme-wipe {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  pointer-events: none;
+  clip-path: circle(0 at calc(100% - 48px) 36px);
+  animation: lnl-theme-wipe 0.72s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+.lnl-theme-wipe.to-dark {
+  background: #06100d;
+}
+.lnl-theme-wipe.to-light {
+  background: #edf7f1;
+}
+.lnl-route-cover {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #030b09;
+  color: #e5eee9;
+  animation: lnl-route-cover-in 0.62s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.lnl-route-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(116, 230, 178, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(116, 230, 178, 0.04) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(circle, #000, transparent 72%);
+}
+.lnl-route-core {
+  position: absolute;
+  top: calc(50% - 92px);
+  left: 50%;
+  width: 154px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(116, 230, 178, 0.2);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: lnl-route-orbit 3s linear infinite;
+}
+.lnl-route-core > span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 68px;
+  height: 68px;
+  padding: 7px;
+  border: 1px solid rgba(116, 230, 178, 0.42);
+  background: #071310;
+  transform: translate(-50%, -50%);
+}
+.lnl-route-core img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: lnl-route-counter 3s linear infinite;
+}
+.lnl-route-core i {
+  position: absolute;
+  top: 50%;
+  left: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #74e6b2;
+  box-shadow: 0 0 14px rgba(116, 230, 178, 0.7);
+}
+.lnl-route-core i:last-child {
+  right: -3px;
+  left: auto;
+}
+.lnl-route-copy {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  margin-top: 146px;
+  text-align: center;
+}
+.lnl-route-copy span,
+.lnl-route-copy p {
+  font: 9px/1.5 var(--font-mono);
+  letter-spacing: 0.14em;
+}
+.lnl-route-copy span {
+  color: #74e6b2;
+}
+.lnl-route-copy strong {
+  font: 400 clamp(26px, 4vw, 42px)/1.1 var(--font-display);
+}
+.lnl-route-copy p {
+  margin: 0;
+  color: #91a79e;
+}
+.lnl-route-track {
+  position: absolute;
+  right: 8vw;
+  bottom: 8vh;
+  left: 8vw;
+  height: 1px;
+  background: rgba(116, 230, 178, 0.14);
+}
+.lnl-route-track i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #74e6b2, #75c9d4);
+  transform-origin: left;
+  animation: lnl-route-track 0.62s cubic-bezier(0.2, 0.72, 0.2, 1) both;
+}
+@keyframes lnl-theme-wipe {
+  52% {
+    clip-path: circle(150vmax at calc(100% - 48px) 36px);
+    opacity: 1;
+  }
+  100% {
+    clip-path: circle(150vmax at calc(100% - 48px) 36px);
+    opacity: 0;
+  }
+}
+@keyframes lnl-route-cover-in {
+  from {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+  }
+}
+@keyframes lnl-route-orbit {
+  to {
+    transform: translate(-50%, -50%) rotate(1turn);
+  }
+}
+@keyframes lnl-route-counter {
+  to {
+    transform: rotate(-1turn);
+  }
+}
+@keyframes lnl-route-track {
+  from {
+    transform: scaleX(0.02);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lnl-theme-wipe,
+  .lnl-route-cover,
+  .lnl-route-core,
+  .lnl-route-core img,
+  .lnl-route-track i {
+    animation: none;
+  }
+}
+</style>

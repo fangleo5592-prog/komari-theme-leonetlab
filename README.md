@@ -1,6 +1,6 @@
 # LeoNetLab Observatory for Komari
 
-与 LeoNetLab 个人站视觉统一的 Komari Monitor 监控主题。主题保留 Komari Emerald 的数据、图表、节点详情、WebSocket/HTTP 回退与响应式地球实现，重新设计了站点外壳、颜色、排版、节点卡片、加载动画和移动端布局。
+与 LeoNetLab 个人站视觉统一的 Komari Monitor 监控主题。主题保留 Komari Emerald 的数据、图表、节点详情、WebSocket/HTTP 回退与响应式地球实现，重新设计了站点外壳、颜色、排版、节点卡片、首访动画、纯点阵数字海洋和移动端布局。
 
 ## 兼容范围
 
@@ -20,7 +20,7 @@ bun run build
 构建完成后会生成：
 
 - `dist/`
-- `komari-theme-leonetlab-build-v1.0.3.zip`
+- `komari-theme-leonetlab-build-v1.1.0.zip`
 
 兼容性与构建检查：
 

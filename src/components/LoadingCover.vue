@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+
+const emit = defineEmits<{ skip: [] }>()
 const regions = [
   { code: 'HK', className: 'n1' },
   { code: 'JP', className: 'n2' },
@@ -9,11 +12,47 @@ const regions = [
   { code: 'DE', className: 'n7' },
   { code: 'ZA', className: 'n8' },
 ]
+
+const phases = [
+  'EDGE DISCOVERY',
+  'ROUTE NEGOTIATION',
+  'SESSION SYNCHRONIZED',
+  'CONSOLE READY',
+]
+const phaseIndex = ref(0)
+const timers: number[] = []
+const viewportWidth = window.innerWidth
+const viewportHeight = window.innerHeight
+const landscapeCompact = viewportHeight < 560 && viewportWidth > viewportHeight
+const mobile = viewportWidth < 680
+const globeSize = landscapeCompact
+  ? Math.min(viewportHeight * 0.66, 320)
+  : mobile
+    ? Math.min(viewportWidth * 0.72, viewportHeight * 0.43, 330)
+    : Math.min(viewportWidth * 0.46, viewportHeight * 0.48, 480)
+const titleSize = mobile
+  ? Math.max(40, Math.min(viewportWidth * 0.13, 58))
+  : Math.max(42, Math.min(viewportWidth * 0.07, viewportHeight * 0.085, 78))
+const introStyle = computed(() => ({
+  '--lnl-intro-globe': `${Math.max(190, globeSize)}px`,
+  '--lnl-intro-title': `${titleSize}px`,
+}))
+
+onMounted(() => {
+  ;[620, 1450, 2350].forEach((delay, index) => {
+    timers.push(window.setTimeout(() => {
+      phaseIndex.value = index + 1
+    }, delay))
+  })
+})
+
+onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
 </script>
 
 <template>
-  <div class="lnl-intro" role="status" aria-live="polite" aria-label="正在连接监控数据">
+  <div class="lnl-intro" :style="introStyle" role="status" aria-live="polite" aria-label="正在连接监控数据">
     <div class="lnl-intro-grid" aria-hidden="true" />
+    <div class="lnl-intro-ocean" aria-hidden="true" />
     <div class="lnl-intro-top" aria-hidden="true">
       <span>LNL / MONITOR SESSION</span><span>08 REGIONS · EDGE READY</span>
     </div>
@@ -41,7 +80,11 @@ const regions = [
       <div class="lnl-intro-copy">
         <span>PRIVATE OBSERVATORY / GLOBAL EDGE</span>
         <strong>LeoNetLab</strong>
-        <p>SYNCHRONIZING NODES · PREPARING LIVE VIEW</p>
+        <p>
+          <Transition name="phase" mode="out-in">
+            <span :key="phases[phaseIndex]">{{ phases[phaseIndex] }}</span>
+          </Transition>
+        </p>
       </div>
     </div>
     <div class="lnl-intro-progress">
@@ -50,6 +93,9 @@ const regions = [
     <div class="lnl-intro-bottom" aria-hidden="true">
       <span>NEGOTIATING EDGE SESSION</span><span>HK · JP · US · SG · UK · FR · DE · ZA</span>
     </div>
+    <button class="lnl-intro-skip" type="button" @click="emit('skip')">
+      跳过
+    </button>
   </div>
 </template>
 
@@ -86,6 +132,20 @@ const regions = [
   background-size: 42px 42px;
   mask-image: radial-gradient(circle at 50% 46%, #000, transparent 74%);
   animation: lnl-grid 1.15s ease both;
+}
+.lnl-intro-ocean {
+  position: absolute;
+  right: -16%;
+  bottom: -38%;
+  left: -16%;
+  height: 72%;
+  opacity: 0.36;
+  background-image: radial-gradient(circle, rgba(116, 230, 178, 0.82) 0 1px, transparent 1.2px);
+  background-size: 27px 21px;
+  transform: perspective(680px) rotateX(66deg);
+  transform-origin: 50% 0;
+  mask-image: linear-gradient(transparent, #000 18%, transparent 92%);
+  animation: lnl-intro-ocean 3.2s ease-in-out both;
 }
 .lnl-intro-top,
 .lnl-intro-bottom {
@@ -361,6 +421,49 @@ const regions = [
   transform-origin: left;
   animation: lnl-track 3.1s cubic-bezier(0.2, 0.72, 0.2, 1) forwards;
 }
+.lnl-intro-skip {
+  position: absolute;
+  z-index: 8;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(44px, calc(env(safe-area-inset-bottom) + 28px));
+  padding: 7px 10px;
+  border: 1px solid rgba(116, 230, 178, 0.2);
+  border-radius: 0;
+  background: rgba(3, 11, 9, 0.58);
+  color: #91a79e;
+  font:
+    9px/1 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+.lnl-intro-skip:hover,
+.lnl-intro-skip:focus-visible {
+  border-color: rgba(116, 230, 178, 0.58);
+  color: #74e6b2;
+}
+.phase-enter-active,
+.phase-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lnl-intro-copy > p span {
+  display: inline-block;
+}
+.phase-enter-from {
+  opacity: 0;
+  transform: translateY(5px);
+}
+.phase-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
 @keyframes lnl-sweep {
   from {
     opacity: 0;
@@ -418,6 +521,19 @@ const regions = [
     transform: scaleX(1);
   }
 }
+@keyframes lnl-intro-ocean {
+  from {
+    opacity: 0;
+    transform: perspective(680px) rotateX(66deg) translate3d(0, 4%, 0);
+  }
+  35% {
+    opacity: 0.36;
+  }
+  to {
+    opacity: 0.24;
+    transform: perspective(680px) rotateX(66deg) translate3d(1.5%, -2%, 0);
+  }
+}
 @media (max-width: 680px) {
   .lnl-intro {
     --lnl-intro-globe: clamp(190px, min(72vw, 43dvh), 330px);
@@ -453,6 +569,9 @@ const regions = [
     right: 18px;
     left: 18px;
   }
+  .lnl-intro-skip {
+    right: 18px;
+  }
 }
 @media (orientation: landscape) and (max-height: 560px) {
   .lnl-intro-scene {
@@ -480,6 +599,12 @@ const regions = [
     animation: none !important;
     opacity: 1;
     transform: none;
+  }
+  .lnl-intro-ocean,
+  .phase-enter-active,
+  .phase-leave-active {
+    animation: none !important;
+    transition: none !important;
   }
   .lnl-intro-node {
     transform: translate(-50%, -50%);

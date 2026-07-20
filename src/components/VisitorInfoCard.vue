@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+
+const props = defineProps<{
+  introComplete: boolean
+  presentOnReady: boolean
+}>()
 
 interface VisitorGeoData {
   ip: string
@@ -45,10 +50,18 @@ const countryCode = ref('')
 const visitTime = ref(formatVisitTime(new Date()))
 const flagVisible = ref(true)
 const expand = ref(false)
+const presentationState = ref<'waiting' | 'scanning' | 'verified' | 'compact'>(
+  props.presentOnReady ? 'waiting' : 'compact',
+)
+const presentationTimers: number[] = []
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+let presentationStarted = false
+const presentationActive = computed(() => presentationState.value === 'scanning' || presentationState.value === 'verified')
+const isExpanded = computed(() => expand.value || presentationActive.value)
 
 const subtitle = computed(() => loading.value ? '检测中' : location.value || '网络访客')
 const flagSrc = computed(() => countryCode.value ? `/images/flags/${countryCode.value}.svg` : '')
-const displayIp = computed(() => expand.value ? ip.value : maskIpForCollapsedState(ip.value))
+const displayIp = computed(() => isExpanded.value ? ip.value : maskIpForCollapsedState(ip.value))
 
 const visitorRows = computed<VisitorInfoRow[]>(() => [
   {
@@ -79,7 +92,24 @@ const visitorRows = computed<VisitorInfoRow[]>(() => [
     expandOnly: true,
   },
 ])
-const visibleRows = computed(() => visitorRows.value.filter(item => expand.value || !item.expandOnly))
+const visibleRows = computed(() => visitorRows.value.filter(item => isExpanded.value || !item.expandOnly))
+
+function startPresentation() {
+  if (presentationStarted || !props.presentOnReady || reducedMotion || !props.introComplete || loading.value)
+    return
+
+  presentationStarted = true
+  presentationState.value = 'scanning'
+  presentationTimers.push(window.setTimeout(() => {
+    presentationState.value = 'verified'
+  }, 1750))
+  presentationTimers.push(window.setTimeout(() => {
+    presentationState.value = 'compact'
+    expand.value = false
+  }, 3650))
+}
+
+watch([() => props.introComplete, loading], startPresentation, { immediate: true })
 
 function getItemTransitionStyle(index: number): Record<string, string> {
   return {
@@ -391,22 +421,35 @@ onMounted(async () => {
 
   loading.value = false
 })
+
+onUnmounted(() => presentationTimers.forEach(timer => window.clearTimeout(timer)))
 </script>
 
 <template>
-  <aside class="lnl-visitor" aria-label="访客网络信息">
+  <aside
+    class="lnl-visitor"
+    :class="[
+      `is-${presentationState}`,
+      { 'is-presenting': presentationActive },
+    ]"
+    aria-label="访客网络信息"
+  >
     <button
       type="button"
       class="lnl-visitor-trigger"
-      :class="{ 'is-expanded': expand }"
-      :aria-expanded="expand"
+      :class="{ 'is-expanded': isExpanded }"
+      :aria-expanded="isExpanded"
       @click="expand = !expand"
     >
+      <span v-if="presentationActive" class="lnl-visitor-scan-head">
+        <span><i /> 身份信息扫描</span>
+        <b>{{ presentationState === 'verified' ? '验证完成' : '解析中' }}</b>
+      </span>
       <TransitionGroup
         tag="div"
         name="visitor-pill"
         class="lnl-visitor-rows transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-        :class="[expand ? 'grid grid-cols-2 items-start justify-start gap-x-3 gap-y-2' : 'flex flex-nowrap items-center justify-center gap-x-3 gap-y-1']"
+        :class="[isExpanded ? 'grid grid-cols-2 items-start justify-start gap-x-3 gap-y-2' : 'flex flex-nowrap items-center justify-center gap-x-3 gap-y-1']"
       >
         <div
           v-for="(item, index) in visibleRows" :key="item.icon"
@@ -425,7 +468,7 @@ onMounted(async () => {
           </div>
           <div
             class="min-w-0 transition-[opacity,transform] duration-220 ease-[cubic-bezier(0.22,1,0.36,1)]"
-            :class="[expand || !index ? 'block opacity-100 translate-y-0' : 'hidden md:block md:opacity-100', !expand && index ? 'md:translate-y-0' : '']"
+            :class="[isExpanded || !index ? 'block opacity-100 translate-y-0' : 'hidden md:block md:opacity-100', !isExpanded && index ? 'md:translate-y-0' : '']"
           >
             <div v-if="loading" class="h-2 w-15 animate-pulse rounded-full bg-muted/70" />
             <p v-else class="max-w-30 truncate text-xs font-medium text-muted-foreground sm:max-w-50">
@@ -435,9 +478,10 @@ onMounted(async () => {
         </div>
       </TransitionGroup>
       <span class="lnl-visitor-action" aria-hidden="true">
-        {{ expand ? '收起' : '详情' }}
-        <Icon :icon="expand ? 'tabler:chevron-up' : 'tabler:chevron-down'" :width="13" :height="13" />
+        {{ isExpanded ? '收起' : '详情' }}
+        <Icon :icon="isExpanded ? 'tabler:chevron-up' : 'tabler:chevron-down'" :width="13" :height="13" />
       </span>
+      <span v-if="presentationState === 'scanning'" class="lnl-visitor-scan-beam" aria-hidden="true" />
     </button>
   </aside>
 </template>
@@ -451,9 +495,18 @@ onMounted(async () => {
   display: flex;
   max-width: min(680px, calc(100vw - 28px));
   justify-content: flex-start;
+  transition:
+    opacity 0.42s ease,
+    transform 0.62s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lnl-visitor.is-waiting {
+  opacity: 0;
+  transform: translate3d(calc(-100% - 28px), 0, 0);
 }
 
 .lnl-visitor-trigger {
+  position: relative;
   display: flex;
   max-width: 100%;
   align-items: center;
@@ -466,10 +519,71 @@ onMounted(async () => {
   backdrop-filter: blur(16px) saturate(120%);
   color: inherit;
   text-align: left;
+  overflow: hidden;
   transition:
     border-color 240ms ease,
     background-color 240ms ease,
     transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lnl-visitor.is-presenting .lnl-visitor-trigger {
+  width: min(540px, calc(100vw - 28px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px 14px;
+  padding: 13px 14px;
+  border-color: color-mix(in srgb, var(--lnl-green) 58%, var(--lnl-line));
+  box-shadow:
+    0 18px 56px rgb(0 0 0 / 24%),
+    inset 0 0 42px color-mix(in srgb, var(--lnl-green) 4%, transparent);
+}
+
+.lnl-visitor.is-presenting .lnl-visitor-rows {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.lnl-visitor-scan-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 9px;
+  border-bottom: 1px solid color-mix(in srgb, var(--lnl-line) 72%, transparent);
+  color: var(--lnl-green);
+  font: 9px/1.2 var(--font-mono);
+  letter-spacing: 0.12em;
+}
+
+.lnl-visitor-scan-head span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.lnl-visitor-scan-head i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lnl-green);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--lnl-green) 70%, transparent);
+  animation: visitor-scan-pulse 0.72s ease-in-out infinite alternate;
+}
+
+.lnl-visitor-scan-head b {
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+.lnl-visitor-scan-beam {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--lnl-green), var(--lnl-cyan), transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--lnl-green) 46%, transparent);
+  animation: visitor-scan-beam 1.7s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .lnl-visitor-trigger:hover,
@@ -518,6 +632,30 @@ onMounted(async () => {
   position: absolute;
 }
 
+@keyframes visitor-scan-beam {
+  from {
+    translate: 0 10px;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  to {
+    translate: 0 136px;
+    opacity: 0;
+  }
+}
+
+@keyframes visitor-scan-pulse {
+  to {
+    opacity: 0.45;
+    transform: scale(0.72);
+  }
+}
+
 @media (max-width: 760px) {
   .lnl-visitor {
     right: 14px;
@@ -528,6 +666,10 @@ onMounted(async () => {
     width: auto;
     max-width: 100%;
     align-items: flex-start;
+  }
+
+  .lnl-visitor.is-presenting .lnl-visitor-trigger {
+    width: 100%;
   }
 
   .lnl-visitor-rows {
@@ -545,6 +687,13 @@ onMounted(async () => {
 
   .lnl-visitor-trigger {
     transition: none;
+  }
+
+  .lnl-visitor,
+  .lnl-visitor-scan-head i,
+  .lnl-visitor-scan-beam {
+    transition: none;
+    animation: none;
   }
 
   .visitor-pill-enter-from,

@@ -12,9 +12,24 @@ import Provider from './components/Provider.vue'
 const appStore = useAppStore()
 
 const isReady = ref(false)
-const showLaunch = ref(true)
+const INTRO_SESSION_KEY = 'leonetlab:intro:1.1.0'
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+function shouldPlayIntro(): boolean {
+  if (reducedMotion)
+    return false
+  try {
+    return sessionStorage.getItem(INTRO_SESSION_KEY) !== 'seen'
+  }
+  catch {
+    return true
+  }
+}
+
+const introWillPlay = shouldPlayIntro()
+const showLaunch = ref(introWillPlay)
+const introComplete = ref(!introWillPlay)
 const launchStartedAt = performance.now()
-const launchMinimumMs = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 2600
+const launchMinimumMs = introWillPlay ? 3100 : 0
 const wait = (duration: number) => new Promise(resolve => window.setTimeout(resolve, duration))
 const pageTransitionProps = computed(() => appStore.disablePageAnimation
   ? { css: false as const }
@@ -40,9 +55,20 @@ onMounted(async () => {
   }
   finally {
     await wait(Math.max(0, launchMinimumMs - (performance.now() - launchStartedAt)))
-    showLaunch.value = false
+    finishIntro()
   }
 })
+
+function finishIntro() {
+  showLaunch.value = false
+  introComplete.value = true
+  try {
+    sessionStorage.setItem(INTRO_SESSION_KEY, 'seen')
+  }
+  catch {
+    // Storage can be unavailable in strict privacy modes.
+  }
+}
 
 onUnmounted(() => {
   destroyInitManager()
@@ -51,8 +77,10 @@ onUnmounted(() => {
 
 <template>
   <Provider>
-    <Background />
-    <LoadingCover v-if="showLaunch" />
+    <Background :paused="showLaunch" />
+    <Transition name="lnl-intro-exit">
+      <LoadingCover v-if="showLaunch" @skip="finishIntro" />
+    </Transition>
     <Header />
     <main v-if="!appStore.loading" class="flex-1">
       <div class="lnl-shell max-w-[1680px] mx-auto">
@@ -65,7 +93,7 @@ onUnmounted(() => {
         </RouterView>
       </div>
     </main>
-    <Footer v-if="!appStore.loading" />
+    <Footer v-if="!appStore.loading" :intro-complete="introComplete" :present-visitor="introWillPlay" />
     <Toaster rich-colors close-button position="top-center" />
   </Provider>
 </template>

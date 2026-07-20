@@ -136,6 +136,7 @@ const server = createServer((request, response) => {
         // This array is the exact collection shape used by Komari 1.2.5-fix1.
         'common:getNodes': clients,
         'common:getNodesLatestStatus': statuses,
+        'common:getNodeRecentStatus': { count: 0, records: [] },
         'common:getRecords': { count: 0, records: [], tasks: [] },
       }
       const result = results[rpcRequest.method]
@@ -184,7 +185,7 @@ const address = server.address()
 assert.ok(address && typeof address === 'object')
 const profile = resolve(tmpdir(), `leonetlab-komari-smoke-${process.pid}`)
 
-async function captureScreenshot(name, width, height, path, virtualTimeBudget) {
+async function captureScreenshot(name, width, height, path, virtualTimeBudget, extraBrowserArgs = []) {
   const screenshotProfile = `${profile}-${name}`
   const screenshotDir = process.env.SMOKE_SCREENSHOT_DIR
   assert.ok(screenshotDir)
@@ -192,6 +193,8 @@ async function captureScreenshot(name, width, height, path, virtualTimeBudget) {
     const child = spawn(browser, [
       '--headless=new',
       '--disable-gpu',
+      '--disable-features=SkiaGraphite',
+      '--no-sandbox',
       '--hide-scrollbars',
       '--no-first-run',
       '--no-default-browser-check',
@@ -199,6 +202,7 @@ async function captureScreenshot(name, width, height, path, virtualTimeBudget) {
       `--window-size=${width},${height}`,
       `--virtual-time-budget=${virtualTimeBudget}`,
       `--screenshot=${resolve(screenshotDir, `${name}.png`)}`,
+      ...extraBrowserArgs,
       `http://127.0.0.1:${address.port}${path}`,
     ], { windowsHide: true })
     let stderr = ''
@@ -220,6 +224,8 @@ try {
     const child = spawn(browser, [
       '--headless=new',
       '--disable-gpu',
+      '--disable-features=SkiaGraphite',
+      '--no-sandbox',
       '--no-first-run',
       '--no-default-browser-check',
       `--user-data-dir=${profile}`,
@@ -251,6 +257,7 @@ try {
     mkdirSync(process.env.SMOKE_SCREENSHOT_DIR, { recursive: true })
     await captureScreenshot('desktop-home', 1920, 1080, '/', 6000)
     await captureScreenshot('desktop-earth-late', 1920, 1080, '/', 12000)
+    await captureScreenshot('desktop-dark', 1920, 1080, '/', 6000, ['--force-dark-mode'])
     await captureScreenshot('desktop-detail', 1600, 1000, `/instance/${nodeUuid}`, 6000)
     await captureScreenshot('mobile-intro', 390, 844, '/', 900)
     await captureScreenshot('mobile-home', 390, 844, '/', 6000)

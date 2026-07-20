@@ -187,7 +187,7 @@ onMounted(async () => {
     <NodeEarthGlobe v-if="showEarth" :nodes="globeNodes" class="col-span-12 col-start-1 md:col-span-6 md:col-start-7" />
     <NodeEarthMaps v-else-if="showMaps" :nodes="globeNodes" class="col-span-12 col-start-1 md:col-span-6 md:col-start-7" />
 
-    <div :class="cardGridClass">
+    <div class="lnl-summary-metrics" :class="cardGridClass">
       <CardX
         hoverable
         class="group h-full border-none rounded-md transition-all"
@@ -478,6 +478,42 @@ onMounted(async () => {
   opacity: 0;
   transform: translateY(-4px);
   filter: blur(2px);
+}
+
+@media (max-width: 760px) {
+  .lnl-summary-metrics {
+    width: calc(100vw - 32px) !important;
+    max-width: calc(100vw - 32px);
+    min-width: 0;
+    height: auto !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(3, minmax(76px, auto)) !important;
+  }
+
+  .lnl-summary-metrics > :nth-child(1) {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+  .lnl-summary-metrics > :nth-child(2) {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+  }
+  .lnl-summary-metrics > :nth-child(3) {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+  }
+  .lnl-summary-metrics > :nth-child(4) {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+  }
+  .lnl-summary-metrics > :nth-child(5) {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
+  }
+  .lnl-summary-metrics > :nth-child(6) {
+    grid-column: 2 !important;
+    grid-row: 3 !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
