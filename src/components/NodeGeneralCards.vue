@@ -259,7 +259,11 @@ onMounted(async () => {
           hoverable
           class="group h-full border-none rounded-md transition-all"
           :class="pickSurfaceClass('bg-background/60 hover:bg-background', 'bg-background/50 hover:bg-background backdrop-blur-xs')"
-          content-class="h-full !p-3" @click="openFinanceCard = !openFinanceCard"
+          content-class="h-full !p-3" role="button" tabindex="0" aria-controls="lnl-finance-popover"
+          aria-label="查看财务汇率详情" :aria-expanded="openFinanceCard" data-finance-trigger
+          @click="openFinanceCard = !openFinanceCard"
+          @keydown.enter.prevent="openFinanceCard = !openFinanceCard"
+          @keydown.space.prevent="openFinanceCard = !openFinanceCard"
         >
           <div class="flex h-full flex-col justify-between gap-1">
             <div class="flex items-start justify-between">
@@ -285,11 +289,12 @@ onMounted(async () => {
           </div>
         </CardX>
         <CardX
-          hoverable
-          class="absolute top-0 left-1/2 z-20 h-42 w-[260%] max-w-88 -translate-x-[50%] -translate-y-[25%] rounded-md border-none shadow-[0_0_20px,0_0_0_1px] shadow-emerald-600/10 transition-all"
+          id="lnl-finance-popover"
+          hoverable data-finance-popover
+          class="lnl-finance-popover absolute top-0 z-20 h-42 rounded-md border-none shadow-[0_0_20px,0_0_0_1px] shadow-emerald-600/10"
           :class="[
             pickSurfaceClass('bg-background', 'bg-background/50 backdrop-blur-lg'),
-            openFinanceCard ? 'opacity-100 scale-100  -translate-y-[5%]' : 'opacity-0 pointer-events-none scale-50',
+            openFinanceCard && 'is-open',
           ]"
           content-class="h-full !p-4" @click="openFinanceCard = false"
         >
@@ -456,6 +461,25 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.lnl-finance-popover {
+  left: 50%;
+  width: 260%;
+  max-width: 22rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(-50%, -25%, 0) scale(0.5);
+  transform-origin: top center;
+  transition:
+    opacity 180ms ease,
+    transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lnl-finance-popover.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(-50%, -5%, 0) scale(1);
+}
+
 .metric-switch-enter-active,
 .metric-switch-leave-active {
   transition:
@@ -481,6 +505,19 @@ onMounted(async () => {
 }
 
 @media (max-width: 760px) {
+  .lnl-finance-popover {
+    right: 0;
+    left: auto;
+    width: calc(200% + 8px);
+    max-width: calc(100vw - 32px);
+    transform: translate3d(0, -18%, 0) scale(0.92);
+    transform-origin: top right;
+  }
+
+  .lnl-finance-popover.is-open {
+    transform: translate3d(0, -5%, 0) scale(1);
+  }
+
   .lnl-summary-metrics {
     width: calc(100vw - 32px) !important;
     max-width: calc(100vw - 32px);

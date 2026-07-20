@@ -148,7 +148,7 @@ const server = createServer((request, response) => {
         theme: 'LeoNetLab',
         theme_settings: {
           rpcTransportMode: 'http',
-          earthViewMode: visualAuditEnabled ? 'earth' : 'hide',
+          earthViewMode: 'earth',
           visitorInfoCardEnabled: false,
           icpEnabled: visualAuditEnabled,
           icpNumber: visualAuditEnabled ? 'ICP 备案示例' : '',
@@ -300,10 +300,9 @@ async function captureScreenshot(name, width, height, path, virtualTimeBudget, e
   })
 }
 
-async function capturePingDialogScreenshot(name, width, height) {
+async function runInteractivePage(name, width, height, expression, screenshotName) {
   const screenshotProfile = `${profile}-${name}`
   const screenshotDir = process.env.SMOKE_SCREENSHOT_DIR
-  assert.ok(screenshotDir)
 
   const child = spawn(browser, [
     '--headless=new',
@@ -316,7 +315,7 @@ async function capturePingDialogScreenshot(name, width, height) {
     '--remote-debugging-port=0',
     `--user-data-dir=${screenshotProfile}`,
     `--window-size=${width},${height}`,
-    `http://127.0.0.1:${address.port}/`,
+    'about:blank',
   ], { windowsHide: true })
 
   let socket
@@ -359,41 +358,30 @@ async function capturePingDialogScreenshot(name, width, height) {
     })
 
     await command('Page.enable')
-    const opened = await command('Runtime.evaluate', {
+    await command('Emulation.setDeviceMetricsOverride', {
+      width,
+      height,
+      deviceScaleFactor: 1,
+      mobile: width <= 760,
+      screenWidth: width,
+      screenHeight: height,
+    })
+    await command('Page.navigate', { url: `http://127.0.0.1:${address.port}/` })
+    await new Promise(resolveWait => setTimeout(resolveWait, 500))
+    const evaluated = await command('Runtime.evaluate', {
       awaitPromise: true,
       returnByValue: true,
-      expression: `new Promise((resolve) => {
-        const deadline = Date.now() + 12000;
-        const timer = setInterval(() => {
-          const button = [...document.querySelectorAll('[role="button"]')]
-            .find((element) => element.getAttribute('aria-label')?.includes('Tokyo Fixture 延迟'));
-          if (button) {
-            clearInterval(timer);
-            button.click();
-            const dialogDeadline = Date.now() + 5000;
-            const dialogTimer = setInterval(() => {
-              if (document.querySelector('.lnl-ping-workspace')) {
-                clearInterval(dialogTimer);
-                resolve('opened');
-              }
-              else if (Date.now() >= dialogDeadline) {
-                clearInterval(dialogTimer);
-                resolve('dialog-timeout');
-              }
-            }, 80);
-          }
-          else if (Date.now() >= deadline) {
-            clearInterval(timer);
-            resolve('button-timeout');
-          }
-        }, 100);
-      })`,
+      expression,
     })
-    assert.equal(opened.result?.value, 'opened')
-    await new Promise(resolveWait => setTimeout(resolveWait, 900))
 
-    const screenshot = await command('Page.captureScreenshot', { format: 'png', fromSurface: true })
-    writeFileSync(resolve(screenshotDir, `${name}.png`), Buffer.from(screenshot.data, 'base64'))
+    if (screenshotName) {
+      assert.ok(screenshotDir)
+      await new Promise(resolveWait => setTimeout(resolveWait, 900))
+      const screenshot = await command('Page.captureScreenshot', { format: 'png', fromSurface: true })
+      writeFileSync(resolve(screenshotDir, `${screenshotName}.png`), Buffer.from(screenshot.data, 'base64'))
+    }
+
+    return evaluated.result?.value
   }
   finally {
     socket?.close()
@@ -409,6 +397,73 @@ async function capturePingDialogScreenshot(name, width, height) {
   }
 }
 
+const pingDialogOpenExpression = `new Promise((resolve) => {
+  const deadline = Date.now() + 12000;
+  const timer = setInterval(() => {
+    const button = document.querySelector('[role="button"][aria-label^="Tokyo Fixture"]');
+    if (button) {
+      clearInterval(timer);
+      button.click();
+      const dialogDeadline = Date.now() + 5000;
+      const dialogTimer = setInterval(() => {
+        if (document.querySelector('.lnl-ping-workspace')) {
+          clearInterval(dialogTimer);
+          resolve('opened');
+        }
+        else if (Date.now() >= dialogDeadline) {
+          clearInterval(dialogTimer);
+          resolve('dialog-timeout');
+        }
+      }, 80);
+    }
+    else if (Date.now() >= deadline) {
+      clearInterval(timer);
+      resolve('button-timeout');
+    }
+  }, 100);
+})`
+
+const financeOverflowAuditExpression = `new Promise((resolve) => {
+  const deadline = Date.now() + 12000;
+  const timer = setInterval(() => {
+    const button = document.querySelector('[data-finance-trigger]');
+    if (button) {
+      clearInterval(timer);
+      button.click();
+      setTimeout(() => {
+        const popover = document.querySelector('[data-finance-popover]');
+        const rect = popover?.getBoundingClientRect();
+        const viewportWidth = document.documentElement.clientWidth;
+        resolve({
+          state: popover?.classList.contains('is-open') ? 'opened' : 'closed',
+          viewportWidth,
+          documentWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+          left: rect?.left ?? -1,
+          right: rect?.right ?? -1,
+        });
+      }, 420);
+    }
+    else if (Date.now() >= deadline) {
+      clearInterval(timer);
+      resolve({ state: 'button-timeout' });
+    }
+  }, 100);
+})`
+
+async function capturePingDialogScreenshot(name, width, height) {
+  const result = await runInteractivePage(name, width, height, pingDialogOpenExpression, name)
+  assert.equal(result, 'opened')
+}
+
+async function auditMobileFinanceOverflow(width) {
+  const screenshotName = process.env.SMOKE_SCREENSHOT_DIR && width === 390 ? 'mobile-finance-open' : undefined
+  const result = await runInteractivePage(`mobile-finance-audit-${width}`, width, 844, financeOverflowAuditExpression, screenshotName)
+  assert.equal(result?.state, 'opened')
+  assert.equal(result?.viewportWidth, width)
+  assert.ok(result?.documentWidth <= result?.viewportWidth, `Mobile document overflowed: ${JSON.stringify(result)}`)
+  assert.ok(result?.left >= 0 && result?.right <= result?.viewportWidth + 0.5, `Finance panel escaped viewport: ${JSON.stringify(result)}`)
+}
+
 try {
   const html = await dumpDom('home', '/')
 
@@ -420,6 +475,10 @@ try {
   assert.match(html, /bg-rose-500\/80/)
   assert.doesNotMatch(html, /暂无节点/)
   assert.ok(rpcCalls.some(call => call.method === 'common:getRecords' && call.params?.type === 'ping' && call.params?.hours === 1 && !call.params?.uuid))
+  if (process.env.SMOKE_SCREENSHOT_DIR)
+    mkdirSync(process.env.SMOKE_SCREENSHOT_DIR, { recursive: true })
+  await auditMobileFinanceOverflow(320)
+  await auditMobileFinanceOverflow(390)
 
   const detailHtml = await dumpDom('detail', `/instance/${nodeUuid}`, 8000)
   assert.match(detailHtml, /资源与系统记录/)
@@ -431,7 +490,6 @@ try {
   console.log('Komari 1.2.5 rendered-node and history-fallback integration smoke test passed.')
 
   if (process.env.SMOKE_SCREENSHOT_DIR) {
-    mkdirSync(process.env.SMOKE_SCREENSHOT_DIR, { recursive: true })
     await captureScreenshot('desktop-home', 1920, 1080, '/', 6000)
     await captureScreenshot('desktop-earth-late', 1920, 1080, '/', 12000)
     await captureScreenshot('desktop-dark', 1920, 1080, '/', 6000, ['--force-dark-mode'])

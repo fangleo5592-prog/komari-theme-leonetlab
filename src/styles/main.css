@@ -130,12 +130,16 @@
 }
 html {
   min-width: 320px;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
   background: var(--background);
   font-family: var(--font-sans);
   scroll-behavior: smooth;
 }
 body {
   min-width: 320px;
+  max-width: 100%;
   min-height: 100vh;
   margin: 0;
   overflow-x: clip;
@@ -146,6 +150,11 @@ body {
   transition:
     color 0.52s cubic-bezier(0.22, 1, 0.36, 1),
     background-color 0.52s cubic-bezier(0.22, 1, 0.36, 1);
+}
+#app {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
 }
 button,
 a,
