@@ -630,13 +630,14 @@ textarea {
 }
 
 .lnl-intro-exit-leave-active {
+  will-change: opacity, transform;
   transition:
     opacity 0.62s cubic-bezier(0.22, 1, 0.36, 1),
-    clip-path 0.62s cubic-bezier(0.22, 1, 0.36, 1);
+    transform 0.62s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .lnl-intro-exit-leave-to {
   opacity: 0;
-  clip-path: inset(0 0 100% 0);
+  transform: translate3d(0, -2.5%, 0) scale(1.008);
 }
 
 @keyframes lnl-live {

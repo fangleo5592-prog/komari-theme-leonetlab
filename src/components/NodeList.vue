@@ -322,7 +322,6 @@ function getCustomTags(node: NodeData): Array<string> {
                 <NodePingListCell
                   :uuid="node.uuid"
                   :online="node.online"
-                  :latest-ping="node.ping"
                   role="button"
                   tabindex="0"
                   class="outline-none"

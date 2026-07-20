@@ -143,6 +143,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
     radial-gradient(circle at 50% 43%, color-mix(in srgb, var(--intro-accent) 14%, transparent), transparent 26rem),
     linear-gradient(112deg, transparent 25%, color-mix(in srgb, var(--intro-cyan) 7%, transparent) 50%, transparent 72%);
   animation: lnl-sweep 2.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform;
 }
 .lnl-intro-grid {
   position: absolute;
@@ -173,6 +174,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
   transform-origin: 50% 0;
   mask-image: linear-gradient(transparent 2%, #000 22%, #000 72%, transparent 96%);
   animation: lnl-intro-ocean 3.2s cubic-bezier(0.18, 0.68, 0.22, 1) both;
+  will-change: opacity, transform;
 }
 .lnl-intro-ocean::after {
   content: '';
@@ -223,6 +225,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
   opacity: 0;
   transform: translate3d(0, 10px, 0) scale(0.9) rotate(-4deg);
   animation: lnl-globe 1.05s 0.05s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
 }
 .lnl-intro-globe::before {
   content: '';
@@ -562,9 +565,6 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
 @keyframes lnl-intro-ocean {
   from {
     opacity: 0;
-    background-position:
-      0 0,
-      12px 9px;
     transform: perspective(540px) rotateX(63deg) translate3d(0, 13%, 0) scale(1.06);
   }
   24% {
@@ -572,9 +572,6 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
   }
   to {
     opacity: 0.22;
-    background-position:
-      12px -54px,
-      24px -45px;
     transform: perspective(540px) rotateX(63deg) translate3d(0, -8%, 0) scale(0.96);
   }
 }

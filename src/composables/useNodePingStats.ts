@@ -44,10 +44,10 @@ interface SharedPingRecordsEntry {
 }
 
 export const NODE_PING_BAR_COUNT = 10
-const CACHE_VERSION = 5
+const CACHE_VERSION = 6
 const CACHE_KEY_PREFIX = 'komari-theme-emerald:node-ping-stats'
 const FULL_LOSS_EPSILON = 1e-6
-const PING_RECORD_REFRESH_INTERVAL_MS = 60_000
+const PING_RECORD_REFRESH_INTERVAL_MS = 30_000
 const sharedPingRecordsCache = new Map<number, SharedPingRecordsEntry>()
 
 interface TaskRecordSummary {
@@ -250,6 +250,8 @@ function startSharedPingRecordsRefresh(entry: SharedPingRecordsEntry, hours: num
     return
 
   entry.refreshTimer = setInterval(() => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden')
+      return
     void loadSharedPingRecords(entry, hours).catch(() => {})
   }, PING_RECORD_REFRESH_INTERVAL_MS)
 }

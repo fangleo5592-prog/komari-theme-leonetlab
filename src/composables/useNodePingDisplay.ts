@@ -1,5 +1,4 @@
 import type { MaybeRefOrGetter } from 'vue'
-import type { NodeStatusPing } from '@/utils/rpc'
 import { computed, toValue } from 'vue'
 import { NODE_PING_BAR_COUNT, useNodePingStats } from '@/composables/useNodePingStats'
 import { formatDateTime } from '@/utils/helper'
@@ -18,7 +17,6 @@ export interface NodePingBar {
 
 interface UseNodePingDisplayOptions {
   enabled?: MaybeRefOrGetter<boolean>
-  latestPing?: MaybeRefOrGetter<Record<string, NodeStatusPing> | undefined>
   loadingDisplayText?: string
   emptyDisplayText?: string
   loadingPanelTooltipText?: Partial<Record<NodePingMetric, string>>
@@ -41,22 +39,6 @@ export function useNodePingDisplay(
     hours: pingRecordsQueryHours,
     enabled: pingStatsEnabled,
   })
-
-  const latestPingEntries = computed(() => Object.entries(
-    options.latestPing === undefined ? {} : (toValue(options.latestPing) ?? {}),
-  ))
-  const latestLatencyValues = computed(() => latestPingEntries.value
-    .map(([, task]) => task.latest)
-    .filter(value => Number.isFinite(value) && value >= 0))
-  const latestLossValues = computed(() => latestPingEntries.value
-    .map(([, task]) => task.loss)
-    .filter(Number.isFinite))
-  const latestLatencyAverage = computed(() => latestLatencyValues.value.length
-    ? latestLatencyValues.value.reduce((sum, value) => sum + value, 0) / latestLatencyValues.value.length
-    : null)
-  const latestLossAverage = computed(() => latestLossValues.value.length
-    ? latestLossValues.value.reduce((sum, value) => sum + value, 0) / latestLossValues.value.length
-    : null)
 
   function buildPingBars(metric: NodePingMetric): NodePingBar[] {
     const points = pingStats.history.value
@@ -100,43 +82,12 @@ export function useNodePingDisplay(
     }))
   }
 
-  function buildLatestPingBars(metric: NodePingMetric): NodePingBar[] {
-    return latestPingEntries.value.slice(0, NODE_PING_BAR_COUNT).map(([taskId, task]) => {
-      const value = metric === 'latency' ? task.latest : task.loss
-      const unavailable = !Number.isFinite(value) || (metric === 'latency' && value < 0)
-
-      return {
-        key: `${metric}-latest-${taskId}`,
-        className: unavailable
-          ? 'bg-muted-foreground/15'
-          : metric === 'latency'
-            ? getLatencyToneClass(value)
-            : getLossToneClass(value),
-        tooltip: unavailable
-          ? `${task.name || `Ping ${taskId}`} N/A`
-          : metric === 'latency'
-            ? `${task.name || `Ping ${taskId}`}\n${Math.round(value)} ms`
-            : `${task.name || `Ping ${taskId}`}\n${value.toFixed(1)}%`,
-      }
-    })
-  }
-
   const latencyBars = computed(() => buildPingBars('latency'))
   const lossBars = computed(() => buildPingBars('loss'))
-  const latencyRenderBars = computed(() => latencyBars.value.length
-    ? latencyBars.value
-    : buildLatestPingBars('latency').length
-      ? buildLatestPingBars('latency')
-      : buildEmptyPingBars('latency'))
-  const lossRenderBars = computed(() => lossBars.value.length
-    ? lossBars.value
-    : buildLatestPingBars('loss').length
-      ? buildLatestPingBars('loss')
-      : buildEmptyPingBars('loss'))
+  const latencyRenderBars = computed(() => latencyBars.value.length ? latencyBars.value : buildEmptyPingBars('latency'))
+  const lossRenderBars = computed(() => lossBars.value.length ? lossBars.value : buildEmptyPingBars('loss'))
 
   const latencyDisplay = computed(() => {
-    if (latestLatencyAverage.value !== null)
-      return `${Math.round(latestLatencyAverage.value)} ms`
     if (pingStats.hasData.value)
       return `${Math.round(pingStats.avgLatency.value)} ms`
     if (pingStats.loading.value)
@@ -145,8 +96,6 @@ export function useNodePingDisplay(
   })
 
   const lossDisplay = computed(() => {
-    if (latestLossAverage.value !== null)
-      return `${latestLossAverage.value.toFixed(1)}%`
     if (pingStats.hasData.value)
       return `${pingStats.avgLoss.value.toFixed(1)}%`
     if (pingStats.loading.value)
@@ -155,31 +104,25 @@ export function useNodePingDisplay(
   })
 
   const latencyPanelTooltip = computed(() => {
-    if (!pingStats.hasData.value && latestLatencyAverage.value === null) {
+    if (!pingStats.hasData.value) {
       if (pingStats.loading.value)
         return options.loadingPanelTooltipText?.latency ?? ''
       return options.emptyPanelTooltipText?.latency ?? ''
     }
-    if (latestLatencyAverage.value !== null)
-      return `当前延迟 ${Math.round(latestLatencyAverage.value)} ms；色块为近 1 小时趋势`
-
-    return `近 1 小时平均延迟 ${Math.round(pingStats.avgLatency.value)} ms`
+    return `平均延迟 ${Math.round(pingStats.avgLatency.value)} ms`
   })
 
   const lossPanelTooltip = computed(() => {
-    if (!pingStats.hasData.value && latestLossAverage.value === null) {
+    if (!pingStats.hasData.value) {
       if (pingStats.loading.value)
         return options.loadingPanelTooltipText?.loss ?? ''
       return options.emptyPanelTooltipText?.loss ?? ''
     }
 
-    const volatility = pingStats.hasData.value && pingStats.avgVolatility.value > 0
+    const volatility = pingStats.avgVolatility.value > 0
       ? `，平均波动 ${pingStats.avgVolatility.value.toFixed(2)}`
       : ''
-    if (latestLossAverage.value !== null)
-      return `近 1 小时平均丢包 ${latestLossAverage.value.toFixed(1)}%；色块为分段趋势${volatility}`
-
-    return `近 1 小时平均丢包 ${pingStats.avgLoss.value.toFixed(1)}%${volatility}`
+    return `平均丢包 ${pingStats.avgLoss.value.toFixed(1)}%${volatility}`
   })
 
   return {

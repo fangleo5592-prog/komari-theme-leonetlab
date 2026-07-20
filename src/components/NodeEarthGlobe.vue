@@ -25,6 +25,7 @@ const displayNodes = computed(() => props.nodes ?? nodesStore.earthNodes)
 
 const containerRef = ref<HTMLDivElement>()
 const canvasRef = ref<HTMLCanvasElement>()
+const dragging = ref(false)
 const { width: containerWidth, height: containerHeight } = useElementSize(containerRef)
 
 const documentVisibility = useDocumentVisibility()
@@ -161,7 +162,6 @@ function syncClusterOverlayPosition(cluster: RegionCluster, el: HTMLDivElement) 
   const { width, height } = getRenderSize()
   if (width <= 0 || height <= 0) {
     el.style.opacity = '0'
-    el.style.visibility = 'hidden'
     return
   }
 
@@ -184,7 +184,6 @@ function syncClusterOverlayPosition(cluster: RegionCluster, el: HTMLDivElement) 
 
   el.style.transform = `translate3d(${xPx}px, ${yPx}px, 0)`
   el.style.opacity = `${visibility}`
-  el.style.visibility = visibility > 0.01 ? 'visible' : 'hidden'
 }
 
 function syncClusterOverlayPositions() {
@@ -207,7 +206,6 @@ function setClusterOverlayEl(code: string, el: Element | ComponentPublicInstance
     }
     else {
       el.style.opacity = '0'
-      el.style.visibility = 'hidden'
     }
     return
   }
@@ -412,6 +410,7 @@ watch(shouldRender, () => {
 
 function onPointerDown(e: PointerEvent) {
   isPointerDown = true
+  dragging.value = true
   lastPointerX = e.clientX
   lastPointerY = e.clientY
   const target = e.currentTarget as HTMLElement
@@ -430,6 +429,7 @@ function onPointerMove(e: PointerEvent) {
 }
 function onPointerUp(e: PointerEvent) {
   isPointerDown = false
+  dragging.value = false
   const target = e.currentTarget as HTMLElement
   if (target.hasPointerCapture(e.pointerId))
     target.releasePointerCapture(e.pointerId)
@@ -447,7 +447,10 @@ const offlineServers = computed(() => totalServers.value - onlineServers.value)
 </script>
 
 <template>
-  <div ref="containerRef" class="node-earth-globe relative aspect-square w-full mx-auto -translate-y-6 md:-translate-y-12">
+  <div
+    ref="containerRef" class="node-earth-globe relative aspect-square w-full mx-auto -translate-y-6 md:-translate-y-12"
+    :class="{ 'is-dragging': dragging }"
+  >
     <canvas
       ref="canvasRef"
       class="earth-globe-canvas absolute inset-0 w-full h-full select-none touch-none cursor-grab active:cursor-grabbing"
@@ -457,7 +460,7 @@ const offlineServers = computed(() => totalServers.value - onlineServers.value)
     <template v-for="cluster in regionClusters" :key="cluster.code">
       <div
         :ref="bindClusterOverlayRef(cluster.code)"
-        class="absolute -top-3.5 left-0 pointer-events-none transition-opacity duration-200"
+        class="lnl-earth-overlay absolute -top-3.5 left-0 pointer-events-none"
       >
         <span class="lnl-earth-flag absolute -bottom-2 -left-2 z-3" aria-hidden="true">
           <span>{{ cluster.code }}</span>
@@ -518,8 +521,8 @@ const offlineServers = computed(() => totalServers.value - onlineServers.value)
 
 .lnl-earth-flag {
   display: grid;
-  width: 22px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   place-items: center;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--lnl-line) 75%, transparent);
@@ -536,6 +539,15 @@ const offlineServers = computed(() => totalServers.value - onlineServers.value)
 .lnl-earth-flag img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+}
+
+.lnl-earth-overlay {
+  transition: opacity 90ms linear;
+  will-change: transform, opacity;
+}
+
+.node-earth-globe.is-dragging .lnl-earth-overlay {
+  transition: none;
 }
 </style>

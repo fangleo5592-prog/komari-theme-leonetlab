@@ -461,12 +461,12 @@ onUnmounted(() => presentationTimers.forEach(timer => window.clearTimeout(timer)
       <TransitionGroup
         tag="div"
         name="visitor-pill"
-        class="lnl-visitor-rows transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        class="lnl-visitor-rows"
         :class="[isExpanded ? 'grid grid-cols-2 items-start justify-start gap-x-3 gap-y-2' : 'flex flex-nowrap items-center justify-center gap-x-3 gap-y-1']"
       >
         <div
           v-for="(item, index) in visibleRows" :key="item.icon"
-          class="lnl-visitor-row flex min-w-0 items-center gap-2 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          class="lnl-visitor-row flex min-w-0 items-center gap-2"
           :style="getItemTransitionStyle(index)"
         >
           <img
@@ -511,14 +511,12 @@ onUnmounted(() => presentationTimers.forEach(timer => window.clearTimeout(timer)
   justify-content: flex-start;
   transition:
     opacity 0.56s ease,
-    transform 0.76s cubic-bezier(0.16, 1, 0.3, 1),
-    filter 0.76s cubic-bezier(0.16, 1, 0.3, 1);
+    transform 0.76s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .lnl-visitor.is-waiting {
   opacity: 0;
   transform: translate3d(calc(-100% - 28px), 0, 0);
-  filter: blur(6px);
 }
 
 .lnl-visitor-trigger {
@@ -534,16 +532,13 @@ onUnmounted(() => presentationTimers.forEach(timer => window.clearTimeout(timer)
   border-radius: 0;
   background: color-mix(in srgb, var(--background) 96%, transparent);
   box-shadow: 0 12px 38px rgb(0 0 0 / 18%);
-  backdrop-filter: blur(16px) saturate(120%);
+  contain: layout paint style;
   color: inherit;
   text-align: left;
   overflow: hidden;
   transition:
     border-color 240ms ease,
     background-color 240ms ease,
-    width 760ms cubic-bezier(0.16, 1, 0.3, 1),
-    padding 620ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 620ms ease,
     transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -561,11 +556,6 @@ onUnmounted(() => presentationTimers.forEach(timer => window.clearTimeout(timer)
 
 .lnl-visitor.is-presenting .lnl-visitor-rows {
   width: 100%;
-}
-
-.lnl-visitor.is-collapsing .lnl-visitor-trigger {
-  width: min(460px, calc(100vw - 28px));
-  padding: 10px 12px;
 }
 
 .lnl-visitor.is-collapsing .lnl-visitor-rows,
@@ -591,6 +581,10 @@ onUnmounted(() => presentationTimers.forEach(timer => window.clearTimeout(timer)
   transition:
     opacity 420ms ease,
     transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lnl-visitor-rows {
+  position: relative;
 }
 
 .lnl-visitor-row small {

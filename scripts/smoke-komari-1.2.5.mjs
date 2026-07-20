@@ -303,7 +303,7 @@ try {
 
   assert.match(html, /Tokyo Fixture/)
   assert.match(html, /Frankfurt Fixture/)
-  assert.match(html, /67 ms/)
+  assert.match(html, /55 ms/)
   assert.match(html, /4\.2%/)
   assert.doesNotMatch(html, /暂无节点/)
 

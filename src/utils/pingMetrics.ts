@@ -20,24 +20,24 @@ export function summarizePingSamples(values: number[]): PingSampleSummary {
 
 export function getLatencyToneClass(latency: number): string {
   if (latency <= 60)
-    return 'bg-emerald-500'
+    return 'bg-emerald-600/90'
   if (latency <= 100)
-    return 'bg-green-400'
+    return 'bg-green-400/80'
   if (latency <= 160)
-    return 'bg-lime-400'
+    return 'bg-lime-400/80'
   if (latency <= 200)
-    return 'bg-yellow-400'
-  return 'bg-rose-500'
+    return 'bg-yellow-400/80'
+  return 'bg-rose-500/80'
 }
 
 export function getLossToneClass(loss: number): string {
   if (loss <= 1)
-    return 'bg-emerald-500'
+    return 'bg-emerald-600/90'
   if (loss <= 3)
-    return 'bg-green-400'
+    return 'bg-green-400/90'
   if (loss <= 6)
-    return 'bg-lime-400'
+    return 'bg-lime-400/90'
   if (loss <= 9)
-    return 'bg-yellow-400'
-  return 'bg-rose-500'
+    return 'bg-yellow-400/90'
+  return 'bg-rose-500/80'
 }

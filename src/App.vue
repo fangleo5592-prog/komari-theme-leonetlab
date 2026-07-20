@@ -28,8 +28,11 @@ function shouldPlayIntro(): boolean {
 const introWillPlay = shouldPlayIntro()
 const showLaunch = ref(introWillPlay)
 const introComplete = ref(!introWillPlay)
+const appShellMounted = ref(!introWillPlay)
+const ambientAnimationReady = ref(!introWillPlay)
 const launchStartedAt = performance.now()
 const launchMinimumMs = introWillPlay ? 3100 : 0
+let introFinalizeTimer: ReturnType<typeof window.setTimeout> | null = null
 const wait = (duration: number) => new Promise(resolve => window.setTimeout(resolve, duration))
 const pageTransitionProps = computed(() => appStore.disablePageAnimation
   ? { css: false as const }
@@ -61,7 +64,9 @@ onMounted(async () => {
 
 function finishIntro() {
   showLaunch.value = false
-  introComplete.value = true
+  if (introFinalizeTimer !== null)
+    window.clearTimeout(introFinalizeTimer)
+  introFinalizeTimer = window.setTimeout(handleIntroAfterLeave, 700)
   try {
     sessionStorage.setItem(INTRO_SESSION_KEY, 'seen')
   }
@@ -70,19 +75,35 @@ function finishIntro() {
   }
 }
 
+function handleIntroAfterLeave() {
+  if (introComplete.value)
+    return
+  if (introFinalizeTimer !== null) {
+    window.clearTimeout(introFinalizeTimer)
+    introFinalizeTimer = null
+  }
+  introComplete.value = true
+  appShellMounted.value = true
+  window.requestAnimationFrame(() => {
+    ambientAnimationReady.value = true
+  })
+}
+
 onUnmounted(() => {
+  if (introFinalizeTimer !== null)
+    window.clearTimeout(introFinalizeTimer)
   destroyInitManager()
 })
 </script>
 
 <template>
   <Provider>
-    <Background :paused="showLaunch" />
-    <Transition name="lnl-intro-exit">
+    <Background v-if="appShellMounted" :paused="!ambientAnimationReady" />
+    <Transition name="lnl-intro-exit" @after-leave="handleIntroAfterLeave">
       <LoadingCover v-if="showLaunch" @skip="finishIntro" />
     </Transition>
-    <Header />
-    <main v-if="!appStore.loading" class="flex-1">
+    <Header v-if="appShellMounted" />
+    <main v-if="appShellMounted && !appStore.loading" class="flex-1">
       <div class="lnl-shell max-w-[1680px] mx-auto">
         <RouterView v-slot="{ Component }">
           <Transition v-bind="pageTransitionProps">
@@ -93,7 +114,7 @@ onUnmounted(() => {
         </RouterView>
       </div>
     </main>
-    <Footer v-if="!appStore.loading" :intro-complete="introComplete" :present-visitor="introWillPlay" />
+    <Footer v-if="appShellMounted && !appStore.loading" :intro-complete="introComplete" :present-visitor="introWillPlay" />
     <Toaster rich-colors close-button position="top-center" />
   </Provider>
 </template>
