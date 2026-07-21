@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { extname, resolve, sep } from 'node:path'
@@ -624,6 +624,12 @@ const visitorCollapseAuditExpression = `new Promise((resolve) => {
       maxLongTask: longTasks.length ? Math.max(...longTasks) : 0,
       maxWidthStep: widths.length > 1 ? Math.max(...widths.slice(1).map((value, index) => Math.abs(value - widths[index]))) : 0,
       maxHeightStep: heights.length > 1 ? Math.max(...heights.slice(1).map((value, index) => Math.abs(value - heights[index]))) : 0,
+      maxHeightVelocity: heightSamples.length > 1
+        ? Math.max(...heightSamples.slice(1).map((sample, index) => {
+            const previous = heightSamples[index];
+            return Math.abs(sample.height - previous.height) / Math.max(sample.time - previous.time, 1);
+          }))
+        : 0,
       largestHeightChanges: heightSamples.slice(1).map((sample, index) => ({
         from: heightSamples[index],
         to: sample,
@@ -693,8 +699,13 @@ async function auditMobileFinanceOverflow(width) {
   assert.ok(result?.left >= 0 && result?.right <= result?.viewportWidth + 0.5, `Finance panel escaped viewport: ${JSON.stringify(result)}`)
 }
 
+function reportBrowserAudit(name, result) {
+  console.log(`[browser-audit] ${name}: ${JSON.stringify(result)}`)
+}
+
 async function auditPingBarGeometry() {
   const result = await runInteractivePage('node-ping-bar-geometry', 1440, 900, pingBarGeometryAuditExpression)
+  reportBrowserAudit('node-ping-bar-geometry', result)
   assert.equal(result?.length, 2, `Expected latency and loss panels: ${JSON.stringify(result)}`)
   for (const panel of result) {
     assert.ok(panel.panelHeight >= 30, `Ping panel collapsed: ${JSON.stringify(panel)}`)
@@ -714,6 +725,7 @@ async function auditConfiguredThemeMode(defaultMode, expectedDark, initScript, e
       .replace('__EXPECTED_APPEARANCE__', expectedAppearance)
       .replace('__EXPECTED_DARK__', String(expectedDark))
     const result = await runInteractivePage(`theme-mode-${defaultMode}-${expectedOverride ?? 'default'}`, 900, 700, expression, undefined, initScript)
+    reportBrowserAudit(`theme-mode-${defaultMode}-${expectedOverride ?? 'default'}`, result)
     assert.equal(result?.appearance, expectedAppearance)
     assert.equal(result?.override, expectedOverride)
     assert.equal(result?.dark, expectedDark)
@@ -726,6 +738,7 @@ async function auditConfiguredThemeMode(defaultMode, expectedDark, initScript, e
 
 async function auditMobileProbeMatrix() {
   const result = await runInteractivePage('mobile-probe-matrix', 390, 844, mobileProbeMatrixAuditExpression)
+  reportBrowserAudit('mobile-probe-matrix', result)
   assert.equal(result?.count, 3, `Expected three mobile probes: ${JSON.stringify(result)}`)
   assert.ok(result?.scrollWidth <= result?.clientWidth + 1, `Mobile probes still require horizontal scrolling: ${JSON.stringify(result)}`)
   assert.equal(result?.rows, 1, `Three probes should fit in one mobile row: ${JSON.stringify(result)}`)
@@ -736,12 +749,16 @@ async function auditVisitorCollapse() {
   visitorInfoEnabledFixture = true
   try {
     const result = await runInteractivePage('visitor-collapse', 900, 700, visitorCollapseAuditExpression, undefined, visitorFixtureInitScript)
+    reportBrowserAudit('visitor-collapse', result)
     assert.equal(result?.state, 'compact', `Visitor presentation did not finish: ${JSON.stringify(result)}`)
     assert.equal(result?.compactingSeen, true, `Visitor compacting phase was skipped: ${JSON.stringify(result)}`)
     assert.ok(result?.frames >= 20, `Visitor collapse produced too few animation frames: ${JSON.stringify(result)}`)
     assert.ok(result?.maxFrame < 160, `Visitor collapse stalled for too long: ${JSON.stringify(result)}`)
     assert.ok(result?.maxLongTask < 160, `Visitor collapse produced a long main-thread task: ${JSON.stringify(result)}`)
-    assert.ok(result?.maxHeightStep < 24, `Visitor collapse height changed too abruptly: ${JSON.stringify(result)}`)
+    // Normalize by elapsed time so a healthy 30 fps CI runner is not judged by
+    // the smaller per-frame distance observed at 60 fps. An actual snap remains
+    // several times faster than the CSS transition and still fails this bound.
+    assert.ok(result?.maxHeightVelocity < 2.5, `Visitor collapse height changed too abruptly: ${JSON.stringify(result)}`)
   }
   finally {
     visitorInfoEnabledFixture = false
@@ -795,6 +812,13 @@ try {
     await captureScreenshot('mobile-home', 390, 844, '/', 6000)
     console.log(`Visual audit screenshots saved to ${process.env.SMOKE_SCREENSHOT_DIR}`)
   }
+}
+catch (error) {
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    const details = error instanceof Error ? (error.stack || error.message) : String(error)
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Komari browser smoke failure\n\n\`\`\`text\n${details.slice(0, 8000)}\n\`\`\`\n`)
+  }
+  throw error
 }
 finally {
   await new Promise(resolveClose => server.close(resolveClose))
