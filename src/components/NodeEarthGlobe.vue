@@ -1,3 +1,9 @@
+<script lang="ts">
+// Intro and dashboard globes are separate WebGL instances during the FLIP
+// handoff. Share only the final orientation so the arriving globe does not
+// jump back to its default angle when the dashboard is revealed.
+</script>
+
 <script setup lang="ts">
 import type { COBEOptions, Globe, Marker } from 'cobe'
 import type { ComponentPublicInstance } from 'vue'
@@ -21,6 +27,8 @@ const props = defineProps<{
   showStatus?: boolean
   motion?: 'auto' | 'static'
 }>()
+
+const sharedIntroOrientation = { phi: 0, theta: 0, valid: false }
 
 const appStore = useAppStore()
 const nodesStore = useNodesStore()
@@ -284,6 +292,11 @@ function buildInitialOptions(): COBEOptions {
 function updateGlobeFrame() {
   if (!globe)
     return
+  if (props.variant === 'intro') {
+    sharedIntroOrientation.phi = phi
+    sharedIntroOrientation.theta = theta
+    sharedIntroOrientation.valid = true
+  }
   const { width, height } = getRenderSize()
   globe.update({ phi, theta, width, height })
   syncClusterOverlayPositions()
@@ -333,6 +346,12 @@ function syncRafState() {
 function startGlobe() {
   if (!canvasRef.value)
     return
+  if (props.variant !== 'intro' && appStore.introActive && sharedIntroOrientation.valid) {
+    phi = sharedIntroOrientation.phi
+    targetPhi = phi
+    theta = sharedIntroOrientation.theta
+    targetTheta = theta
+  }
   if (appStore.earthViewMode === 'earth-stop') {
     resetStoppedView()
     triggerStaticRedrawWindow()
@@ -437,6 +456,12 @@ watch(
       return
     await nextTick()
     requestAnimationFrame(() => {
+      if (sharedIntroOrientation.valid) {
+        phi = sharedIntroOrientation.phi
+        targetPhi = phi
+        theta = sharedIntroOrientation.theta
+        targetTheta = theta
+      }
       updateGlobeFrame()
       syncRafState()
     })
@@ -503,6 +528,7 @@ const offlineServers = computed(() => totalServers.value - onlineServers.value)
       variant === 'intro' ? '' : '-translate-y-6 md:-translate-y-12',
       interactive ? 'touch-none cursor-grab active:cursor-grabbing' : '',
     ]"
+    :role="interactive ? 'img' : undefined"
     :aria-label="interactive ? '可拖动旋转的全球节点地球' : undefined"
     @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerup="onPointerUp" @pointercancel="onPointerUp"
   >
@@ -613,22 +639,26 @@ const offlineServers = computed(() => totalServers.value - onlineServers.value)
   transition: none;
 }
 
-.node-earth-globe.is-intro .lnl-earth-overlay {
-  animation: intro-marker-focus 620ms calc(360ms + var(--lnl-marker-index, 0) * 70ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+.node-earth-globe.is-intro .lnl-earth-overlay > * {
+  animation: intro-marker-focus 820ms calc(420ms + var(--lnl-marker-index, 0) * 52ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, filter;
 }
 
 @keyframes intro-marker-focus {
   from {
-    filter: blur(11px);
+    opacity: 0;
+    filter: blur(5px);
   }
   to {
+    opacity: 1;
     filter: blur(0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .node-earth-globe.is-intro .lnl-earth-overlay {
+  .node-earth-globe.is-intro .lnl-earth-overlay > * {
     animation: none;
+    opacity: 1;
     filter: none;
   }
 }

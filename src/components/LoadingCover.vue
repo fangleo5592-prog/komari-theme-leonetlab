@@ -58,7 +58,7 @@ function handleLogoError(event: Event) {
 }
 
 onMounted(() => {
-  ;[620, 1420, 2260].forEach((delay, index) => {
+  ;[760, 1720, 2860].forEach((delay, index) => {
     timers.push(window.setTimeout(() => {
       phaseIndex.value = index + 1
     }, delay))
@@ -92,7 +92,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
           variant="intro"
           :interactive="false"
           :show-status="false"
-          motion="static"
+          motion="auto"
         />
         <div class="lnl-intro-globe-hud" aria-hidden="true">
           <span class="lnl-intro-logo">
@@ -151,7 +151,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
   overflow: hidden;
   contain: layout paint style;
   isolation: isolate;
-  background: var(--intro-bg);
+  background-color: var(--intro-bg);
   color: var(--intro-ink);
 }
 
@@ -192,7 +192,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
   mask-image: linear-gradient(transparent, #000 25%, transparent 92%);
   transform: perspective(560px) rotateX(65deg) translate3d(0, 8%, 0);
   transform-origin: top;
-  animation: intro-ocean 3.2s cubic-bezier(0.2, 0.72, 0.2, 1) both;
+  animation: intro-ocean 4.2s cubic-bezier(0.2, 0.72, 0.2, 1) both;
 }
 
 .lnl-intro-top,
@@ -382,7 +382,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
   background: linear-gradient(90deg, var(--intro-accent), var(--intro-cyan));
   transform: scaleX(0);
   transform-origin: left;
-  animation: intro-track 3.1s cubic-bezier(0.2, 0.72, 0.2, 1) forwards;
+  animation: intro-track 4.1s cubic-bezier(0.2, 0.72, 0.2, 1) forwards;
 }
 .lnl-intro-skip {
   position: absolute;
@@ -444,8 +444,8 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
   transform: none;
   filter: none;
   transition:
-    opacity 0.14s 0.7s ease,
-    transform 0.84s cubic-bezier(0.2, 0.78, 0.2, 1);
+    opacity 0.16s 0.88s ease,
+    transform 1s cubic-bezier(0.2, 0.78, 0.2, 1);
   transform-origin: top left;
 }
 .lnl-intro.lnl-intro-exit-leave-to .lnl-intro-globe {
@@ -456,13 +456,34 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
 .lnl-intro.lnl-intro-exit-leave-active
   :is(.lnl-intro-copy, .lnl-intro-telemetry, .lnl-intro-top, .lnl-intro-bottom, .lnl-intro-progress, .lnl-intro-skip) {
   transition:
-    opacity 0.28s ease,
-    transform 0.38s ease;
+    opacity 0.42s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.52s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .lnl-intro.lnl-intro-exit-leave-to
   :is(.lnl-intro-copy, .lnl-intro-telemetry, .lnl-intro-top, .lnl-intro-bottom, .lnl-intro-progress, .lnl-intro-skip) {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+.lnl-intro.lnl-intro-exit-leave-active {
+  transition: background-color 0.72s 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.lnl-intro.lnl-intro-exit-leave-to {
+  background-color: transparent;
+}
+.lnl-intro.lnl-intro-exit-leave-active :is(.lnl-intro-grid, .lnl-intro-ocean) {
+  transition:
+    opacity 0.7s 0.12s ease,
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lnl-intro.lnl-intro-exit-leave-to :is(.lnl-intro-grid, .lnl-intro-ocean) {
+  opacity: 0;
+}
+.lnl-intro.lnl-intro-exit-leave-to .lnl-intro-grid {
+  transform: scale(1.035);
+}
+.lnl-intro.lnl-intro-exit-leave-to .lnl-intro-ocean {
+  transform: perspective(560px) rotateX(65deg) translate3d(0, -13%, 0);
 }
 
 @keyframes intro-grid-in {

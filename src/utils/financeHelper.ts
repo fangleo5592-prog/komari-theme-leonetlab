@@ -87,12 +87,7 @@ const EXPLICIT_CURRENCY_ALIASES: Record<string, CurrencyCode> = {
 const CURRENCY_SYMBOL_ALIASES = createCurrencySymbolAliases()
 
 export function normalizeCurrency(currency: string | null | undefined): CurrencyCode {
-  const value = String(currency || 'CNY').trim().toUpperCase()
-
-  if (isSupportedCurrency(value))
-    return value
-
-  return EXPLICIT_CURRENCY_ALIASES[value] || CURRENCY_SYMBOL_ALIASES[value] || 'CNY'
+  return resolveCurrency(currency) ?? 'CNY'
 }
 
 export function isSupportedCurrency(currency: string): currency is CurrencyCode {
@@ -116,6 +111,21 @@ function createCurrencySymbolAliases(): Record<string, CurrencyCode> {
 
     return aliases
   }, {})
+}
+
+function resolveCurrency(currency: string | null | undefined): CurrencyCode | null {
+  const value = String(currency ?? '').trim().toUpperCase()
+  if (!value)
+    return 'CNY'
+  if (isSupportedCurrency(value))
+    return value
+  return EXPLICIT_CURRENCY_ALIASES[value] || CURRENCY_SYMBOL_ALIASES[value] || null
+}
+
+function isComplimentaryNode(node: NodeData): boolean {
+  return String(node.tags ?? '')
+    .split(';')
+    .some(tag => tag.trim().includes('白嫖'))
 }
 
 export function getTodayDateKey(date = new Date()): string {
@@ -145,7 +155,7 @@ export function calculateTotalRemainingValueCNY(
   now = new Date(),
 ): number {
   return nodes.reduce((sum, node) => {
-    if (excludeFreeTags && node.tags?.includes('白嫖中'))
+    if (excludeFreeTags && isComplimentaryNode(node))
       return sum
 
     return sum + calculateRemainingValueCNY(node, exchangeRates, now)
@@ -158,7 +168,7 @@ export function calculateTotalValueCNY(
   excludeFreeTags = true,
 ): number {
   return nodes.reduce((sum, node) => {
-    if (excludeFreeTags && node.tags?.includes('白嫖中'))
+    if (excludeFreeTags && isComplimentaryNode(node))
       return sum
 
     return sum + getPriceCNY(node, exchangeRates)
@@ -178,7 +188,7 @@ export function calculateTotalMonthlyAverageCostCNY(
   excludeFreeTags = true,
 ): number {
   return nodes.reduce((sum, node) => {
-    if (excludeFreeTags && node.tags?.includes('白嫖中'))
+    if (excludeFreeTags && isComplimentaryNode(node))
       return sum
 
     return sum + calculateMonthlyAverageCostCNY(node, exchangeRates)
@@ -206,7 +216,7 @@ export function calculateTotalDailyCostCNY(
   excludeFreeTags = true,
 ): number {
   return nodes.reduce((sum, node) => {
-    if (excludeFreeTags && node.tags?.includes('白嫖'))
+    if (excludeFreeTags && isComplimentaryNode(node))
       return sum
 
     const priceCNY = getPriceCNY(node, exchangeRates)
@@ -318,11 +328,17 @@ function getPriceCNY(node: NodeData, exchangeRates: ExchangeRates): number {
   if (!Number.isFinite(price) || price <= 0)
     return 0
 
-  const currency = normalizeCurrency(node.currency)
+  const currency = resolveCurrency(node.currency)
+  if (!currency)
+    return 0
   if (currency === 'CNY')
     return price
 
-  return price / exchangeRates[currency]
+  const rate = Number(exchangeRates[currency])
+  if (!Number.isFinite(rate) || rate <= 0)
+    return 0
+
+  return price / rate
 }
 
 async function fetchExchangeRates(): Promise<ExchangeRates | null> {

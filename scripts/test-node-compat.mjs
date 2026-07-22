@@ -1,7 +1,20 @@
 import assert from 'node:assert/strict'
-import { calculateTotalDailyCostCNY, DEFAULT_EXCHANGE_RATES } from '../src/utils/financeHelper.ts'
+import {
+  calculateRemainingValueCNY,
+  calculateTotalDailyCostCNY,
+  calculateTotalMonthlyAverageCostCNY,
+  calculateTotalValueCNY,
+  calculateValueCNY,
+  DEFAULT_EXCHANGE_RATES,
+} from '../src/utils/financeHelper.ts'
 import { normalizeUuidCollection } from '../src/utils/nodeResponse.ts'
-import { getLatencyToneClass, getLossToneClass, summarizePingSamples } from '../src/utils/pingMetrics.ts'
+import {
+  getLatencyToneClass,
+  getLossToneClass,
+  getPingTaskIdsWithSamples,
+  summarizePingSamples,
+} from '../src/utils/pingMetrics.ts'
+import { cutPeakValues, fillMissingTimePoints } from '../src/utils/recordHelper.ts'
 import { normalizeRecordCollection } from '../src/utils/recordResponse.ts'
 
 const nodeA = { uuid: 'node-a', name: 'Tokyo' }
@@ -44,11 +57,66 @@ assert.equal(getLatencyToneClass(150), 'bg-lime-400/80')
 assert.equal(getLossToneClass(0), 'bg-emerald-600/90')
 assert.equal(getLatencyToneClass(201), 'bg-rose-500/80')
 assert.equal(getLossToneClass(10), 'bg-rose-500/80')
+assert.equal(getLatencyToneClass(60), 'bg-emerald-600/90')
+assert.equal(getLatencyToneClass(61), 'bg-green-400/80')
+assert.equal(getLatencyToneClass(100), 'bg-green-400/80')
+assert.equal(getLatencyToneClass(101), 'bg-lime-400/80')
+assert.equal(getLatencyToneClass(160), 'bg-lime-400/80')
+assert.equal(getLatencyToneClass(161), 'bg-yellow-400/80')
+assert.equal(getLatencyToneClass(200), 'bg-yellow-400/80')
+assert.equal(getLossToneClass(1), 'bg-emerald-600/90')
+assert.equal(getLossToneClass(1.1), 'bg-green-400/90')
+assert.equal(getLossToneClass(3), 'bg-green-400/90')
+assert.equal(getLossToneClass(3.1), 'bg-lime-400/90')
+assert.equal(getLossToneClass(6), 'bg-lime-400/90')
+assert.equal(getLossToneClass(6.1), 'bg-yellow-400/90')
+assert.equal(getLossToneClass(9), 'bg-yellow-400/90')
+
+// A task with only failed samples must remain visible and report 100% loss.
+assert.deepEqual([...getPingTaskIdsWithSamples([
+  { task_id: 7, value: -1 },
+  { task_id: 7, value: -1 },
+])], [7])
+assert.deepEqual(summarizePingSamples([-1, -1]), { latency: null, loss: 100 })
+
+// A source record can occupy at most one display slot even when the match
+// tolerance is wider than the display interval.
+const filledRecords = fillMissingTimePoints([
+  { time: '2026-07-20T00:00:00Z', cpu: 10 },
+  { time: '2026-07-20T00:02:00Z', cpu: 30 },
+], 60, 180, 120)
+assert.equal(filledRecords.length, 3)
+assert.equal(filledRecords.filter(record => record.cpu === 10).length, 1)
+assert.equal(filledRecords.filter(record => record.cpu === 30).length, 1)
+assert.equal(filledRecords.filter(record => record.cpu === null).length, 1)
+
+// Visual smoothing must not manufacture samples across a missing-data gap.
+const smoothedRecords = cutPeakValues([
+  { time: '2026-07-20T00:00:00Z', latency: 100 },
+  { time: '2026-07-20T00:01:00Z', latency: null },
+  { time: '2026-07-20T00:02:00Z', latency: 120 },
+], ['latency'])
+assert.equal(smoothedRecords[1].latency, null)
 
 const dailyCost = calculateTotalDailyCostCNY([
   { price: 30, billing_cycle: 30, currency: 'CNY', tags: '' },
   { price: 0, billing_cycle: 30, currency: 'CNY', tags: '' },
 ], DEFAULT_EXCHANGE_RATES)
 assert.equal(dailyCost, 1)
+
+const usdRates = { ...DEFAULT_EXCHANGE_RATES, USD: 0.14799 }
+const usdNode = { price: 14.799, billing_cycle: 30, currency: 'USD', tags: '' }
+assert.ok(Math.abs(calculateValueCNY(usdNode, usdRates) - 100) < 1e-8)
+assert.equal(calculateValueCNY({ ...usdNode, currency: 'UNKNOWN' }, usdRates), 0)
+assert.equal(calculateValueCNY(usdNode, { ...usdRates, USD: 0 }), 0)
+
+const paidNode = { price: 30, billing_cycle: 30, currency: 'CNY', tags: 'production' }
+const freeNode = { price: 300, billing_cycle: 30, currency: 'CNY', tags: 'edge; 白嫖 ;test' }
+assert.equal(calculateTotalValueCNY([paidNode, freeNode], DEFAULT_EXCHANGE_RATES), 30)
+assert.equal(calculateTotalMonthlyAverageCostCNY([paidNode, freeNode], DEFAULT_EXCHANGE_RATES), 30)
+
+const now = new Date('2026-07-20T00:00:00Z')
+const expiringNode = { ...paidNode, expired_at: '2026-08-04T00:00:00Z' }
+assert.equal(calculateRemainingValueCNY(expiringNode, DEFAULT_EXCHANGE_RATES, now), 15)
 
 console.log('Komari 1.2.5-fix1/1.2.5-fix2/1.2.7 node, record, and Ping metric compatibility passed.')

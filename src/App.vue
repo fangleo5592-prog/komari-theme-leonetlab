@@ -14,8 +14,8 @@ const appStore = useAppStore()
 const isReady = ref(false)
 // Bump this key only when a release intentionally needs to present the intro
 // again. The value still keeps the animation to once per browser session.
-const INTRO_SESSION_KEY = 'leonetlab:intro:1.2.2'
-const INTRO_HANDOFF_DURATION_MS = 920
+const INTRO_SESSION_KEY = 'leonetlab:intro:1.2.5'
+const INTRO_HANDOFF_DURATION_MS = 1080
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 function shouldPlayIntro(): boolean {
   if (reducedMotion)
@@ -38,7 +38,7 @@ const introRevealActive = ref(false)
 const introFinishing = ref(false)
 const loadingCoverRef = ref<InstanceType<typeof LoadingCover> | null>(null)
 const launchStartedAt = performance.now()
-const launchMinimumMs = introWillPlay ? 3200 : 0
+const launchMinimumMs = introWillPlay ? 4200 : 0
 let introFinalizeTimer: ReturnType<typeof window.setTimeout> | null = null
 let introRevealTimer: ReturnType<typeof window.setTimeout> | null = null
 let ambientStartTimer: ReturnType<typeof window.setTimeout> | null = null

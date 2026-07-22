@@ -201,7 +201,7 @@ onMounted(async () => {
           <div class="flex items-start justify-between">
             <span class="text-xs font-medium tracking-wider text-muted-foreground">内存用量</span>
             <Icon
-              icon="tabler:cash" :width="20" :height="20"
+              icon="icon-park-outline:memory" :width="20" :height="20"
               class="text-slate-500/20 group-hover:text-slate-500 transition-colors"
             />
           </div>
@@ -260,12 +260,13 @@ onMounted(async () => {
           class="group h-full border-none rounded-md transition-all"
           :class="pickSurfaceClass('bg-background/60 hover:bg-background', 'bg-background/50 hover:bg-background backdrop-blur-xs')"
           content-class="h-full !p-3" role="button" tabindex="0" aria-controls="lnl-finance-popover"
-          aria-label="查看财务汇率详情" :aria-expanded="openFinanceCard" data-finance-trigger
+          :aria-expanded="openFinanceCard" data-finance-trigger
           @click="openFinanceCard = !openFinanceCard"
           @keydown.enter.prevent="openFinanceCard = !openFinanceCard"
           @keydown.space.prevent="openFinanceCard = !openFinanceCard"
         >
           <div class="flex h-full flex-col justify-between gap-1">
+            <span class="sr-only">按下查看财务汇率详情</span>
             <div class="flex items-start justify-between">
               <span class="text-xs font-medium tracking-wider text-muted-foreground">剩余价值</span>
               <Icon

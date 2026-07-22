@@ -232,17 +232,19 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
       <dl class="lnl-dashboard-status">
         <div><dt>ONLINE</dt><dd>{{ onlineNodeCount }}<span>/ {{ totalNodeCount }}</span></dd></div>
         <div><dt>TRANSPORT</dt><dd>{{ appStore.rpcTransportMode.toUpperCase() }}</dd></div>
-        <div class="lnl-dashboard-status-aux" :class="{ 'is-urgent': auxiliaryStatus.urgent }">
-          <Transition name="status-rotate" mode="out-in">
-            <div :key="auxiliaryStatus.key" class="lnl-dashboard-status-aux-inner">
-              <dt>{{ auxiliaryStatus.label }}</dt>
-              <dd :title="auxiliaryStatus.value">
-                <span class="lnl-dashboard-status-value">{{ auxiliaryStatus.value }}</span>
-                <small>{{ auxiliaryStatus.meta }}</small>
-              </dd>
-            </div>
-          </Transition>
-        </div>
+        <Transition name="status-rotate" mode="out-in">
+          <div
+            :key="auxiliaryStatus.key"
+            class="lnl-dashboard-status-aux lnl-dashboard-status-aux-inner"
+            :class="{ 'is-urgent': auxiliaryStatus.urgent }"
+          >
+            <dt>{{ auxiliaryStatus.label }}</dt>
+            <dd :title="auxiliaryStatus.value">
+              <span class="lnl-dashboard-status-value">{{ auxiliaryStatus.value }}</span>
+              <small>{{ auxiliaryStatus.meta }}</small>
+            </dd>
+          </div>
+        </Transition>
       </dl>
     </section>
     <div v-if="appStore.connectionError" class="alert px-4">

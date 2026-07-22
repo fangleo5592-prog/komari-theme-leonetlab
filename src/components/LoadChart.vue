@@ -512,7 +512,7 @@ const memoryChartOption = computed(() => ({
     {
       name: 'RAM',
       type: 'line',
-      data: chartData.value.map(r => r.ram ?? 0),
+      data: chartData.value.map(r => r.ram),
 
       showSymbol: false,
       lineStyle: { width: 1.5, color: chartColors.primary, cap: 'round' as const },
@@ -533,7 +533,7 @@ const memoryChartOption = computed(() => ({
     {
       name: 'Swap',
       type: 'line',
-      data: chartData.value.map(r => r.swap ?? 0),
+      data: chartData.value.map(r => r.swap),
 
       showSymbol: false,
       lineStyle: { width: 1.5, color: chartColors.secondary, cap: 'round' as const },
@@ -587,7 +587,7 @@ const diskChartOption = computed(() => ({
     {
       name: '磁盘已用',
       type: 'line',
-      data: chartData.value.map(r => r.disk ?? 0),
+      data: chartData.value.map(r => r.disk),
 
       showSymbol: false,
       lineStyle: { width: 1.5, color: chartColors.tertiary, cap: 'round' as const },
@@ -662,7 +662,7 @@ const networkChartOption = computed(() => ({
     {
       name: '下载',
       type: 'line',
-      data: chartData.value.map(r => r.net_in ?? 0),
+      data: chartData.value.map(r => r.net_in),
 
       showSymbol: false,
       lineStyle: { width: 1.5, color: chartColors.quinary, cap: 'round' as const },
@@ -670,7 +670,7 @@ const networkChartOption = computed(() => ({
     {
       name: '上传',
       type: 'line',
-      data: chartData.value.map(r => r.net_out ?? 0),
+      data: chartData.value.map(r => r.net_out),
 
       showSymbol: false,
       lineStyle: { width: 1.5, color: chartColors.quaternary, cap: 'round' as const },
@@ -733,7 +733,7 @@ const connectionsChartOption = computed(() => ({
     {
       name: 'TCP',
       type: 'line',
-      data: chartData.value.map(r => r.connections ?? 0),
+      data: chartData.value.map(r => r.connections),
 
       showSymbol: false,
       lineStyle: { width: 1.5, color: chartColors.primary, cap: 'round' as const },
@@ -741,7 +741,7 @@ const connectionsChartOption = computed(() => ({
     {
       name: 'UDP',
       type: 'line',
-      data: chartData.value.map(r => r.connections_udp ?? 0),
+      data: chartData.value.map(r => r.connections_udp),
 
       showSymbol: false,
       lineStyle: { width: 1.5, color: chartColors.tertiary, cap: 'round' as const },
@@ -793,7 +793,7 @@ const processChartOption = computed(() => ({
     {
       name: '进程数',
       type: 'line',
-      data: chartData.value.map(r => r.process ?? 0),
+      data: chartData.value.map(r => r.process),
 
       showSymbol: false,
       lineStyle: { width: 1.5, color: chartColors.quaternary, cap: 'round' as const },

@@ -10,7 +10,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useBackgroundSurface } from '@/composables/useBackgroundSurface'
 import { useAppStore } from '@/stores/app'
-import { cutPeakValues, interpolateNullsLinear } from '@/utils/recordHelper'
+import { cutPeakValues } from '@/utils/recordHelper'
 import { getSharedRpc, RpcError } from '@/utils/rpc'
 import '@/utils/echarts' // 共享 ECharts 配置
 
@@ -21,6 +21,8 @@ const props = defineProps<{
 const appStore = useAppStore()
 const { pickSurfaceClass } = useBackgroundSurface()
 const isDark = computed(() => appStore.isDark)
+const reduceChartMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const motionEnabled = computed(() => !appStore.disablePageAnimation && !reduceChartMotion)
 // 使用共享的 RPC 实例，避免重复创建连接
 const rpc = getSharedRpc()
 
@@ -111,6 +113,13 @@ interface PingRecord {
   value: number
 }
 
+interface PingLossPoint {
+  task_id: number
+  time: string
+  /** 0..1 ratio for metric data; legacy losses use 1. */
+  loss: number
+}
+
 interface TaskInfo {
   id: number
   name: string
@@ -172,11 +181,13 @@ interface PingRecordsResponse {
 
 interface PingChartData {
   records: PingRecord[]
+  lossPoints: PingLossPoint[]
   tasks: TaskInfo[]
 }
 
 // 数据状态
 const remoteData = shallowRef<PingRecord[]>([])
+const remoteLossData = shallowRef<PingLossPoint[]>([])
 const tasks = shallowRef<TaskInfo[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -234,7 +245,13 @@ async function fetchMetricRecords(uuid: string, hours: number): Promise<PingChar
       hours,
       downsample: true,
       max_points: 500,
-      aggregation: 'avg',
+      fill_empty: true,
+      aggregation_by_metric: {
+        // Ping latency stores packet loss as -1. `last` preserves that
+        // sentinel so fill_empty can turn an all-loss bucket into a gap.
+        'ping.latency_ms': 'last',
+        'ping.loss': 'avg',
+      },
     }),
     rpc.getClient().call<PingMetricStatsResponse>('public:getPingMetricStats', {
       uuid,
@@ -244,6 +261,7 @@ async function fetchMetricRecords(uuid: string, hours: number): Promise<PingChar
   ])
 
   const records: PingRecord[] = []
+  const lossPoints: PingLossPoint[] = []
   for (const series of metricResult?.series ?? []) {
     for (const point of series.points ?? []) {
       const taskId = getMetricTaskId(series, point)
@@ -253,15 +271,21 @@ async function fetchMetricRecords(uuid: string, hours: number): Promise<PingChar
       if (point.value === null)
         continue
 
-      if (series.metric_key === 'ping.loss' && point.value <= 0)
+      if (series.metric_key === 'ping.loss') {
+        if (point.value > 0) {
+          lossPoints.push({ task_id: taskId, time: point.time, loss: point.value })
+        }
         continue
+      }
 
-      records.push({
-        client: uuid,
-        task_id: taskId,
-        time: point.time,
-        value: series.metric_key === 'ping.loss' ? -1 : point.value,
-      })
+      if (point.value >= 0) {
+        records.push({
+          client: uuid,
+          task_id: taskId,
+          time: point.time,
+          value: point.value,
+        })
+      }
     }
   }
 
@@ -269,7 +293,7 @@ async function fetchMetricRecords(uuid: string, hours: number): Promise<PingChar
     id: Number(task.task_id),
     name: task.name || `Ping ${task.task_id}`,
     interval: task.interval ?? 60,
-    loss: task.loss,
+    loss: Number.isFinite(task.loss) ? task.loss : 0,
     p99: task.p99,
     p50: task.p50,
     p99_p50_ratio: task.p99_p50_ratio,
@@ -281,7 +305,7 @@ async function fetchMetricRecords(uuid: string, hours: number): Promise<PingChar
     type: task.type,
   })).filter(task => Number.isInteger(task.id))
 
-  return { records, tasks: metricTasks }
+  return { records, lossPoints, tasks: metricTasks }
 }
 
 async function fetchLegacyRecords(uuid: string, hours: number): Promise<PingChartData> {
@@ -294,6 +318,9 @@ async function fetchLegacyRecords(uuid: string, hours: number): Promise<PingChar
 
   return {
     records: result?.records ?? [],
+    lossPoints: (result?.records ?? [])
+      .filter(record => record.value < 0)
+      .map(record => ({ task_id: record.task_id, time: record.time, loss: 1 })),
     tasks: result?.tasks ?? [],
   }
 }
@@ -335,6 +362,7 @@ async function fetchRecords() {
     records.sort((a, b) => dayjs(a.time).valueOf() - dayjs(b.time).valueOf())
 
     remoteData.value = records
+    remoteLossData.value = result.lossPoints
     tasks.value = result.tasks
 
     if (tasks.value.length > 0 && selectedTaskIds.value.length === 0) {
@@ -347,6 +375,7 @@ async function fetchRecords() {
 
     error.value = err instanceof Error ? err.message : '获取数据失败'
     remoteData.value = []
+    remoteLossData.value = []
     tasks.value = []
   }
   finally {
@@ -426,14 +455,6 @@ const chartData = computed(() => {
     data = cutPeakValues(data, selectedKeys)
   }
 
-  if (selectedKeys.length > 0 && data.length > 0) {
-    data = interpolateNullsLinear(data, selectedKeys, {
-      maxGapMultiplier: 6,
-      minCapMs: 2 * 60_000,
-      maxCapMs: 30 * 60_000,
-    })
-  }
-
   return data
 })
 
@@ -508,7 +529,7 @@ const packetLossMarkers = computed(() => {
 
   for (const task of selectedTasks.value) {
     const points = new Set<number>()
-    const taskLossRecords = remoteData.value.filter(rec => rec.task_id === task.id && rec.value < 0)
+    const taskLossRecords = remoteLossData.value.filter(rec => rec.task_id === task.id && rec.loss > 0)
 
     for (const record of taskLossRecords) {
       const lossTs = dayjs(record.time).valueOf()
@@ -599,7 +620,7 @@ const pingChartOption = computed(() => {
       name: task.name,
       type: 'line' as const,
       data: data.map(d => d[task.id] as number | null ?? null),
-      smooth: showDelay.value ? (cutPeak.value ? 0.6 : 0.1) : 0,
+      smooth: showDelay.value ? (cutPeak.value ? 0.28 : 0.08) : 0,
       showSymbol: false,
       connectNulls: false,
       lineStyle: { width: showDelay.value ? 1.5 : 0, color, cap: 'round' as const },
@@ -632,7 +653,7 @@ const pingChartOption = computed(() => {
   })
 
   return {
-    animation: !appStore.disablePageAnimation,
+    animation: motionEnabled.value,
     animationDuration: 560,
     animationDurationUpdate: 240,
     animationEasing: 'cubicOut' as const,
@@ -738,6 +759,7 @@ watch(selectedView, () => {
 
 watch(() => props.uuid, () => {
   remoteData.value = []
+  remoteLossData.value = []
   tasks.value = []
   selectedTaskIds.value = []
   fetchRecords()
@@ -762,7 +784,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="lnl-ping-panel" :class="{ 'is-motion-enabled': !appStore.disablePageAnimation }">
+  <div class="lnl-ping-panel" :class="{ 'is-motion-enabled': motionEnabled }">
     <div class="lnl-ping-toolbar">
       <div class="lnl-ping-window">
         <span>OBSERVATION WINDOW</span>
@@ -834,7 +856,7 @@ onUnmounted(() => {
                   <small>ms</small>
                 </div>
                 <div class="lnl-ping-probe-meta">
-                  <span>LOSS {{ task.loss.toFixed(2) }}%</span>
+                  <span>LOSS {{ Number.isFinite(task.loss) ? task.loss.toFixed(2) : '0.00' }}%</span>
                   <span v-if="task.p99_p50_ratio !== undefined">JIT {{ task.p99_p50_ratio.toFixed(2) }}</span>
                 </div>
                 <DataTooltip placement="top" content-class="!rounded-none p-3 w-60 backdrop-blur">
@@ -884,10 +906,13 @@ onUnmounted(() => {
                 <Button variant="ghost" size="xs" class="h-7 rounded-none" :class="[cutPeak && '!text-emerald-600']" @click="cutPeak = !cutPeak">
                   平滑
                 </Button>
-                <DataTooltip content="使用 EWMA 算法平滑数据并过滤突变值" placement="top" :content-class="pickSurfaceClass('whitespace-nowrap text-[11px]', 'whitespace-nowrap text-[11px] backdrop-blur-xl')">
-                  <Button variant="ghost" size="icon-xs" class="text-slate-500">
+                <DataTooltip placement="bottom" width="272" :content-class="pickSurfaceClass('text-[11px] leading-relaxed', 'text-[11px] leading-relaxed backdrop-blur-xl')">
+                  <Button variant="ghost" size="icon-xs" class="text-slate-500" aria-label="查看 Ping 平滑算法说明">
                     <Icon icon="carbon:information" :width="14" :height="14" />
                   </Button>
+                  <template #content>
+                    <span>Komari 1.2.7+ 使用每时间桶末值绘制延迟、平均值标记丢包，避免把 -1 丢包编码参与延迟平均。开启“平滑”只对延迟折线应用 EWMA 与异常峰值抑制，不修改原始统计、丢包标记或节点质量色块。</span>
+                  </template>
                 </DataTooltip>
               </div>
             </div>
@@ -1227,7 +1252,8 @@ onUnmounted(() => {
   }
   .lnl-ping-plot-actions {
     width: 100%;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    overflow: visible;
   }
   .lnl-ping-chart {
     min-height: 300px;

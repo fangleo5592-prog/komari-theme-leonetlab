@@ -1,7 +1,7 @@
 import type { MaybeRefOrGetter } from 'vue'
 import { useThrottleFn } from '@vueuse/core'
 import { computed, onScopeDispose, ref, shallowRef, toValue, watch } from 'vue'
-import { summarizePingSamples } from '@/utils/pingMetrics'
+import { getPingTaskIdsWithSamples, summarizePingSamples } from '@/utils/pingMetrics'
 import { getSharedRpc } from '@/utils/rpc'
 
 export interface NodePingHistoryPoint {
@@ -50,11 +50,6 @@ const FULL_LOSS_EPSILON = 1e-6
 const PING_RECORD_REFRESH_INTERVAL_MS = 30_000
 const sharedPingRecordsCache = new Map<number, SharedPingRecordsEntry>()
 
-interface TaskRecordSummary {
-  total: number
-  success: number
-}
-
 function createEmptyStats(): NodePingStatsState {
   return {
     avgLatency: 0,
@@ -73,31 +68,6 @@ function average(values: number[]): number {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
-}
-
-function summarizeTaskRecords(records: PingRecord[]): Map<number, TaskRecordSummary> {
-  const summaries = new Map<number, TaskRecordSummary>()
-
-  for (const record of records) {
-    const summary = summaries.get(record.task_id) ?? { total: 0, success: 0 }
-    summary.total += 1
-    if (record.value >= 0) {
-      summary.success += 1
-    }
-    summaries.set(record.task_id, summary)
-  }
-
-  return summaries
-}
-
-function getIncludedTaskIds(records: PingRecord[]): Set<number> {
-  const recordSummaries = summarizeTaskRecords(records)
-
-  return new Set(
-    [...recordSummaries.entries()]
-      .filter(([, summary]) => summary.total > 0 && summary.success > 0)
-      .map(([taskId]) => taskId),
-  )
 }
 
 function getCacheKey(uuid: string, hours: number): string {
@@ -336,7 +306,8 @@ function getPercentile(values: number[], percentile: number): number | null {
 }
 
 function buildStats(records: PingRecord[]): NodePingStatsState {
-  const includedTaskIds = getIncludedTaskIds(records)
+  // 有记录即代表探针有效；整段全为 -1 是真实的 100% 丢包，不能排除。
+  const includedTaskIds = getPingTaskIdsWithSamples(records)
 
   if (!includedTaskIds.size)
     return createEmptyStats()
@@ -351,8 +322,6 @@ function buildStats(records: PingRecord[]): NodePingStatsState {
     taskRecords.set(record.task_id, currentRecords)
   }
 
-  const latencyValues: number[] = []
-  const taskLossValues: number[] = []
   const volatilityValues: number[] = []
 
   for (const recordsByTask of taskRecords.values()) {
@@ -362,9 +331,6 @@ function buildStats(records: PingRecord[]): NodePingStatsState {
 
     if (!validValues.length)
       continue
-
-    latencyValues.push(average(validValues))
-    taskLossValues.push((recordsByTask.length - validValues.length) / recordsByTask.length * 100)
 
     if (validValues.length > 1) {
       const p50 = getPercentile(validValues, 0.5)
@@ -382,10 +348,12 @@ function buildStats(records: PingRecord[]): NodePingStatsState {
     .map(point => point.loss)
     .filter(isFiniteNumber)
 
-  const avgLatency = latencyValues.length ? average(latencyValues) : average(historyLatencyValues)
-  const avgLoss = taskLossValues.length ? average(taskLossValues) : average(historyLossValues)
+  // 按实际样本加权，避免不同采样间隔的探针被错误地等权平均。
+  const combinedSummary = summarizePingSamples(filteredRecords.map(record => record.value))
+  const avgLatency = combinedSummary.latency ?? average(historyLatencyValues)
+  const avgLoss = combinedSummary.loss ?? average(historyLossValues)
   const avgVolatility = average(volatilityValues)
-  const hasData = history.length > 0 || latencyValues.length > 0 || taskLossValues.length > 0
+  const hasData = history.length > 0 || filteredRecords.length > 0
 
   return {
     avgLatency,

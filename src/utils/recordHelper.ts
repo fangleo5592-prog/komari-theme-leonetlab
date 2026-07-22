@@ -91,8 +91,10 @@ export function fillMissingTimePoints<T extends { time?: string, updated_at?: st
   const getTime = (item: T) =>
     dayjs(item.time ?? item.updated_at ?? '').valueOf()
 
-  // 预计算时间戳，避免重复解析
-  const timedData = data.map(item => ({ item, timeMs: getTime(item) }))
+  // 预计算时间戳并剔除非法记录，避免无效日期污染排序和补点。
+  const timedData = data
+    .map(item => ({ item, timeMs: getTime(item) }))
+    .filter(entry => Number.isFinite(entry.timeMs))
   timedData.sort((a, b) => a.timeMs - b.timeMs)
 
   const firstItem = timedData[0]
@@ -119,29 +121,31 @@ export function fillMissingTimePoints<T extends { time?: string, updated_at?: st
   // 创建空值模板
   const nullTemplate = createNullTemplate(lastItem.item) as T
 
-  let dataIdx = 0
   const matchToleranceMs = (matchToleranceSec ?? intervalSec) * 1000
 
-  const filled: T[] = timePoints.map((t) => {
-    let found: T | undefined
+  // 每条原始记录最多落入一个最近的时间格。旧实现命中后没有推进游标，
+  // 在容差大于间隔时会把同一采样重复复制到多个格子，制造虚假平台。
+  const slots = new Map<number, { item: T, distance: number }>()
+  for (const entry of timedData) {
+    const slotIndex = Math.round((entry.timeMs - start) / interval)
+    if (slotIndex < 0 || slotIndex >= timePoints.length)
+      continue
 
-    // 跳过太旧的数据点
-    while (
-      dataIdx < timedData.length
-      && timedData[dataIdx]!.timeMs < t - matchToleranceMs
-    ) {
-      dataIdx++
-    }
+    const slotTime = timePoints[slotIndex]
+    if (slotTime === undefined)
+      continue
 
-    const currentData = timedData[dataIdx]
-    // 检查当前数据点是否在容差范围内
-    if (
-      currentData
-      && Math.abs(currentData.timeMs - t) <= matchToleranceMs
-    ) {
-      found = currentData.item
-    }
+    const distance = Math.abs(entry.timeMs - slotTime)
+    if (distance > matchToleranceMs)
+      continue
 
+    const current = slots.get(slotIndex)
+    if (!current || distance < current.distance)
+      slots.set(slotIndex, { item: entry.item, distance })
+  }
+
+  const filled: T[] = timePoints.map((t, index) => {
+    const found = slots.get(index)?.item
     if (found) {
       // 找到则使用，但对齐时间到网格
       return { ...found, time: dayjs(t).toISOString() }
@@ -276,96 +280,76 @@ export function interpolateNullsLinear(
 }
 
 /**
- * EWMA（指数加权移动平均）峰值裁剪
- * 使用指数加权移动平均算法平滑数据，同时检测并过滤突变值，填充 null/undefined 值
+ * EWMA（指数加权移动平均）视觉平滑
+ * 使用 Hampel 风格的中位数/MAD 检测抑制孤立异常点，再应用 EWMA。
+ * null/undefined 代表真实缺测或丢包，必须原样保留，不能前向填充。
  *
  * @param data 输入数据数组
  * @param keys 需要处理的数值属性名数组
  * @param alpha 平滑因子
  * @param windowSize 突变检测窗口大小
- * @param spikeThreshold 突变阈值
+ * @param spikeThreshold MAD 倍数阈值
  */
 export function cutPeakValues(
   data: AnyRecord[],
   keys: string[],
   alpha: number = 0.3,
   windowSize: number = 15,
-  spikeThreshold: number = 0.3,
+  spikeThreshold: number = 3,
 ): AnyRecord[] {
   if (!data || data.length === 0)
     return data
 
-  const result: AnyRecord[] = [...data]
+  const result: AnyRecord[] = data.map(row => ({ ...row }))
   const halfWindow = Math.floor(windowSize / 2)
 
+  const median = (values: number[]): number => {
+    const sorted = [...values].sort((a, b) => a - b)
+    const middle = Math.floor(sorted.length / 2)
+    const upper = sorted[middle]
+    if (upper === undefined)
+      return 0
+    if (sorted.length % 2 === 1)
+      return upper
+    return ((sorted[middle - 1] ?? upper) + upper) / 2
+  }
+
   for (const key of keys) {
-    // 第一步：检测并移除突变值
-    for (let i = 0; i < result.length; i++) {
-      const currentRow = result[i]
-      if (!currentRow)
-        continue
-      const currentValue = currentRow[key]
-
-      if (currentValue != null && typeof currentValue === 'number') {
-        const neighborValues: number[] = []
-
-        // 收集窗口范围内的邻近有效值
-        for (
-          let j = Math.max(0, i - halfWindow);
-          j <= Math.min(result.length - 1, i + halfWindow);
-          j++
-        ) {
-          if (j === i)
-            continue
-          const neighborRow = result[j]
-          if (!neighborRow)
-            continue
-          const neighbor = neighborRow[key]
-          if (neighbor != null && typeof neighbor === 'number') {
-            neighborValues.push(neighbor)
-          }
-        }
-
-        // 如果有足够的邻近值进行突变检测
-        if (neighborValues.length >= 2) {
-          const neighborSum = neighborValues.reduce((sum, val) => sum + val, 0)
-          const neighborMean = neighborValues.length > 0 ? neighborSum / neighborValues.length : 0
-
-          // 检测突变
-          if (neighborMean > 0) {
-            const relativeChange = Math.abs(currentValue - neighborMean) / neighborMean
-            if (relativeChange > spikeThreshold) {
-              result[i] = { ...currentRow, [key]: null }
-            }
-          }
-          else if (Math.abs(currentValue) > 10) {
-            result[i] = { ...currentRow, [key]: null }
-          }
-        }
-      }
-    }
-
-    // 第二步：使用 EWMA 平滑和填充
+    const sourceValues = data.map(row => row?.[key])
     let ewma: number | null = null
 
     for (let i = 0; i < result.length; i++) {
       const row = result[i]
       if (!row)
         continue
-      const currentValue = row[key]
+      const rawValue = sourceValues[i]
+      if (typeof rawValue !== 'number' || !Number.isFinite(rawValue)) {
+        row[key] = null
+        continue
+      }
 
-      if (currentValue != null && typeof currentValue === 'number') {
-        if (ewma === null) {
-          ewma = currentValue
-        }
-        else {
-          ewma = alpha * currentValue + (1 - alpha) * ewma
-        }
-        result[i] = { ...row, [key]: ewma }
+      const neighborValues = sourceValues
+        .slice(Math.max(0, i - halfWindow), Math.min(sourceValues.length, i + halfWindow + 1))
+        .filter((value, neighborIndex): value is number => {
+          const absoluteIndex = Math.max(0, i - halfWindow) + neighborIndex
+          return absoluteIndex !== i && typeof value === 'number' && Number.isFinite(value)
+        })
+
+      let filteredValue = rawValue
+      if (neighborValues.length >= 3) {
+        const center = median(neighborValues)
+        const mad = median(neighborValues.map(value => Math.abs(value - center)))
+        const robustLimit = mad > 0
+          ? spikeThreshold * 1.4826 * mad
+          : Math.max(1, Math.abs(center) * 0.5)
+        if (Math.abs(rawValue - center) > robustLimit)
+          filteredValue = center
       }
-      else if (ewma !== null) {
-        result[i] = { ...row, [key]: ewma }
-      }
+
+      ewma = ewma === null
+        ? filteredValue
+        : alpha * filteredValue + (1 - alpha) * ewma
+      row[key] = ewma
     }
   }
 
