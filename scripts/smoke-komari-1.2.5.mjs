@@ -11,6 +11,9 @@ const root = resolve(import.meta.dirname, '..')
 const dist = resolve(root, 'dist')
 const visualAuditEnabled = Boolean(process.env.SMOKE_SCREENSHOT_DIR)
 const financeDetailsLabelPattern = /查看财务汇率详情/
+const introMarkerFocusPattern = /intro-marker-focus/
+const pingSectionInPattern = /ping-section-in/
+const pingChartInPattern = /ping-chart-in/
 const nodeUuid = 'fixture-node-a'
 const secondNodeUuid = 'fixture-node-b'
 function client(uuid, name, region, weight) {
@@ -154,6 +157,7 @@ const dialogPingRecords = [
 ]
 const rpcCalls = []
 let defaultThemeModeFixture = 'system'
+let earthViewModeFixture = 'earth'
 let visitorInfoEnabledFixture = false
 const leadingSlashesPattern = /^\/+/
 const lineBreakPattern = /\r?\n/
@@ -204,7 +208,7 @@ const server = createServer((request, response) => {
         theme_settings: {
           rpcTransportMode: 'http',
           defaultThemeMode: defaultThemeModeFixture,
-          earthViewMode: 'earth',
+          earthViewMode: earthViewModeFixture,
           visitorInfoCardEnabled: visitorInfoEnabledFixture,
           icpEnabled: visualAuditEnabled,
           icpNumber: visualAuditEnabled ? 'ICP 备案示例' : '',
@@ -706,25 +710,138 @@ const introHandoffAuditExpression = `new Promise((resolve) => {
       const sourceRect = source.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
       const staged = Boolean(document.querySelector('.lnl-intro-staged'));
+      const markerAnimation = getComputedStyle(source.querySelector('.lnl-earth-overlay')).animationName;
+      const frameDeltas = [];
+      const longTasks = [];
+      let samplingFrames = true;
+      let lastFrame = performance.now();
+      const frameTick = (now) => {
+        frameDeltas.push(now - lastFrame);
+        lastFrame = now;
+        if (samplingFrames)
+          requestAnimationFrame(frameTick);
+      };
+      requestAnimationFrame(frameTick);
+      const longTaskObserver = typeof PerformanceObserver === 'function'
+        ? new PerformanceObserver(list => longTasks.push(...list.getEntries().map(entry => entry.duration)))
+        : null;
+      try { longTaskObserver?.observe({ type: 'longtask', buffered: false }); } catch {}
+      const distance = (rect) => Math.hypot(rect.left - targetRect.left, rect.top - targetRect.top) + Math.abs(rect.width - targetRect.width);
+      const sample = () => {
+        const currentRoot = document.querySelector('.lnl-intro');
+        const currentSource = document.querySelector('.lnl-intro-globe');
+        const rect = currentSource?.getBoundingClientRect();
+        return {
+          rootMounted: Boolean(currentRoot),
+          sourceMounted: Boolean(currentSource),
+          distance: rect ? distance(rect) : null,
+          rect: rect?.toJSON() || null,
+          transform: currentSource ? getComputedStyle(currentSource).transform : null,
+          rootClass: currentRoot?.className || null,
+          staged: Boolean(document.querySelector('.lnl-intro-staged')),
+        };
+      };
       skip.click();
-      setTimeout(() => {
+      setTimeout(async () => {
         const style = root.style;
         const handoffX = Number.parseFloat(style.getPropertyValue('--intro-handoff-x'));
         const handoffY = Number.parseFloat(style.getPropertyValue('--intro-handoff-y'));
         const handoffScale = Number.parseFloat(style.getPropertyValue('--intro-handoff-scale'));
+        const early = sample();
+        await new Promise(done => setTimeout(done, 350));
+        const middle = sample();
+        await new Promise(done => setTimeout(done, 340));
+        const late = sample();
+        await new Promise(done => setTimeout(done, 260));
+        const settled = sample();
+        samplingFrames = false;
+        longTaskObserver?.disconnect();
         resolve({
           handoffReady: root.classList.contains('is-handoff-ready'),
           staged,
+          markerAnimation,
+          sourceRect: sourceRect.toJSON(),
+          targetRect: targetRect.toJSON(),
+          initialDistance: distance(sourceRect),
+          early,
+          middle,
+          late,
+          settled,
+          frames: frameDeltas.length,
+          maxFrame: Math.max(0, ...frameDeltas),
+          maxLongTask: Math.max(0, ...longTasks),
           xError: Math.abs(handoffX - (targetRect.left - sourceRect.left)),
           yError: Math.abs(handoffY - (targetRect.top - sourceRect.top)),
           scaleError: Math.abs(handoffScale - targetRect.width / sourceRect.width),
         });
-      }, 80);
+      }, 70);
     }
     else if (Date.now() >= deadline) {
       clearInterval(timer);
       resolve({ state: 'timeout', hasRoot: Boolean(root), hasSource: Boolean(source), hasTarget: Boolean(target) });
     }
+  }, 60);
+})`
+
+const globeMotionAuditExpression = `new Promise((resolve) => {
+  const deadline = Date.now() + 12000;
+  const timer = setInterval(() => {
+    const globe = document.querySelector('.node-earth-globe:not(.is-intro)');
+    const overlay = globe?.querySelector('.lnl-earth-overlay');
+    if (globe && overlay) {
+      clearInterval(timer);
+      setTimeout(() => {
+        const before = overlay.style.transform;
+        setTimeout(() => {
+          resolve({
+            before,
+            after: overlay.style.transform,
+            moved: before !== overlay.style.transform,
+            mode: '__EARTH_MODE__',
+          });
+        }, 760);
+      }, 260);
+    }
+    else if (Date.now() >= deadline) {
+      clearInterval(timer);
+      resolve({ state: 'timeout' });
+    }
+  }, 60);
+})`
+
+const pingContentMotionAuditExpression = `new Promise((resolve) => {
+  const deadline = Date.now() + 12000;
+  const timer = setInterval(() => {
+    const trigger = document.querySelector('[role="button"][aria-label^="Tokyo Fixture"]');
+    if (!trigger) {
+      if (Date.now() >= deadline) {
+        clearInterval(timer);
+        resolve({ state: 'trigger-timeout' });
+      }
+      return;
+    }
+    clearInterval(timer);
+    trigger.click();
+    const contentDeadline = Date.now() + 5000;
+    const contentTimer = setInterval(() => {
+      const panel = document.querySelector('.lnl-ping-panel.is-motion-enabled');
+      const toolbar = panel?.querySelector('.lnl-ping-toolbar');
+      const probe = panel?.querySelector('.lnl-ping-probe');
+      const chart = panel?.querySelector('.lnl-ping-chart');
+      if (toolbar && probe && chart) {
+        clearInterval(contentTimer);
+        resolve({
+          toolbarAnimation: getComputedStyle(toolbar).animationName,
+          probeAnimation: getComputedStyle(probe).animationName,
+          chartAnimation: getComputedStyle(chart).animationName,
+          chartCanvas: Boolean(chart.querySelector('canvas')),
+        });
+      }
+      else if (Date.now() >= contentDeadline) {
+        clearInterval(contentTimer);
+        resolve({ state: 'content-timeout' });
+      }
+    }, 40);
   }, 60);
 })`
 
@@ -916,7 +1033,7 @@ const visitorFixtureInitScript = `(() => {
 })()`
 
 async function capturePingDialogScreenshot(name, width, height) {
-  const result = await runInteractivePage(name, width, height, pingDialogOpenExpression, name, `sessionStorage.setItem('leonetlab:intro:1.2.1', 'seen');`)
+  const result = await runInteractivePage(name, width, height, pingDialogOpenExpression, name, `sessionStorage.setItem('leonetlab:intro:1.2.2', 'seen');`)
   assert.equal(result?.state, 'opened')
   assert.ok(result?.left >= -0.5 && result?.right <= result?.viewportWidth + 0.5, `Ping dialog escaped viewport: ${JSON.stringify(result)}`)
   assert.ok(result?.centerError <= 1, `Ping dialog is not centered: ${JSON.stringify(result)}`)
@@ -924,7 +1041,7 @@ async function capturePingDialogScreenshot(name, width, height) {
 
 async function auditMobileFinanceOverflow(width) {
   const screenshotName = process.env.SMOKE_SCREENSHOT_DIR && width === 390 ? 'mobile-finance-open' : undefined
-  const result = await runInteractivePage(`mobile-finance-audit-${width}`, width, 844, financeOverflowAuditExpression, screenshotName, `sessionStorage.setItem('leonetlab:intro:1.2.1', 'seen');`)
+  const result = await runInteractivePage(`mobile-finance-audit-${width}`, width, 844, financeOverflowAuditExpression, screenshotName, `sessionStorage.setItem('leonetlab:intro:1.2.2', 'seen');`)
   assert.equal(result?.state, 'opened')
   assert.doesNotMatch(result?.triggerText ?? '', financeDetailsLabelPattern)
   assert.equal(result?.textFits, true, `Finance trigger text escaped its card: ${JSON.stringify(result)}`)
@@ -977,7 +1094,7 @@ async function auditGlobeFlagsAcrossThemeChange() {
     780,
     globeFlagThemeAuditExpression,
     undefined,
-    `sessionStorage.setItem('leonetlab:intro:1.2.1', 'seen'); localStorage.setItem('appearance', 'light'); localStorage.setItem('leonetlab:appearance:user-override', '1');`,
+    `sessionStorage.setItem('leonetlab:intro:1.2.2', 'seen'); localStorage.setItem('appearance', 'light'); localStorage.setItem('leonetlab:appearance:user-override', '1');`,
   )
   reportBrowserAudit('globe-flags-theme-change', result)
   assert.equal(result?.initialCount, 2, `Expected two globe flag overlays: ${JSON.stringify(result)}`)
@@ -996,7 +1113,7 @@ async function auditPingDialogCloseAnimation() {
     780,
     pingDialogCloseAuditExpression,
     undefined,
-    `sessionStorage.setItem('leonetlab:intro:1.2.1', 'seen');`,
+    `sessionStorage.setItem('leonetlab:intro:1.2.2', 'seen');`,
   )
   reportBrowserAudit('ping-dialog-close-animation', result)
   assert.equal(result?.closedSeen, true, `Ping dialog skipped its closed state: ${JSON.stringify(result)}`)
@@ -1009,6 +1126,54 @@ async function auditIntroGlobeHandoff() {
   assert.equal(result?.handoffReady, true, `Intro globe did not prepare a dashboard handoff: ${JSON.stringify(result)}`)
   assert.equal(result?.staged, true, `Dashboard content was not staged behind the intro: ${JSON.stringify(result)}`)
   assert.ok(result?.xError < 1 && result?.yError < 1 && result?.scaleError < 0.01, `Intro handoff geometry did not match the dashboard globe: ${JSON.stringify(result)}`)
+  assert.match(result?.markerAnimation || '', introMarkerFocusPattern, `Intro node markers did not use the focus reveal: ${JSON.stringify(result)}`)
+  assert.equal(result?.early?.rootMounted, true, `Intro cover was removed before the handoff could start: ${JSON.stringify(result)}`)
+  assert.equal(result?.middle?.rootMounted, true, `Intro cover did not survive the handoff midpoint: ${JSON.stringify(result)}`)
+  assert.ok(result?.early?.distance <= result?.initialDistance + 1, `Intro globe moved away before its handoff: ${JSON.stringify(result)}`)
+  assert.ok(result?.early?.rect?.left >= result?.sourceRect?.left - 2, `Intro globe snapped away from its target before moving: ${JSON.stringify(result)}`)
+  assert.ok(result?.middle?.distance < result?.early?.distance, `Intro globe did not progress through the handoff: ${JSON.stringify(result)}`)
+  assert.ok(result?.late?.distance < result?.middle?.distance, `Intro globe did not settle toward the dashboard target: ${JSON.stringify(result)}`)
+  assert.ok(result?.late?.distance < 28, `Intro globe missed the dashboard target before release: ${JSON.stringify(result)}`)
+  assert.equal(result?.settled?.rootMounted, false, `Intro cover remained after its handoff duration: ${JSON.stringify(result)}`)
+  assert.equal(result?.settled?.staged, false, `Dashboard content stayed staged after the handoff: ${JSON.stringify(result)}`)
+  assert.ok(result?.frames >= 20, `Intro handoff produced too few animation frames: ${JSON.stringify(result)}`)
+  assert.ok(result?.maxFrame < 160, `Intro handoff stalled between frames: ${JSON.stringify(result)}`)
+  assert.ok(result?.maxLongTask < 160, `Intro handoff produced a long main-thread task: ${JSON.stringify(result)}`)
+}
+
+async function auditGlobeMotionMode(mode, expectedMoved) {
+  earthViewModeFixture = mode
+  try {
+    const result = await runInteractivePage(
+      `globe-motion-${mode}`,
+      1100,
+      780,
+      globeMotionAuditExpression.replace('__EARTH_MODE__', mode),
+      undefined,
+      `sessionStorage.setItem('leonetlab:intro:1.2.2', 'seen');`,
+    )
+    reportBrowserAudit(`globe-motion-${mode}`, result)
+    assert.equal(result?.moved, expectedMoved, `Unexpected ${mode} globe motion: ${JSON.stringify(result)}`)
+  }
+  finally {
+    earthViewModeFixture = 'earth'
+  }
+}
+
+async function auditPingContentMotion() {
+  const result = await runInteractivePage(
+    'ping-content-motion',
+    1100,
+    780,
+    pingContentMotionAuditExpression,
+    undefined,
+    `sessionStorage.setItem('leonetlab:intro:1.2.2', 'seen');`,
+  )
+  reportBrowserAudit('ping-content-motion', result)
+  assert.match(result?.toolbarAnimation || '', pingSectionInPattern, `Ping toolbar has no entrance transition: ${JSON.stringify(result)}`)
+  assert.match(result?.probeAnimation || '', pingSectionInPattern, `Ping probes have no entrance transition: ${JSON.stringify(result)}`)
+  assert.match(result?.chartAnimation || '', pingChartInPattern, `Ping chart has no entrance transition: ${JSON.stringify(result)}`)
+  assert.equal(result?.chartCanvas, true, `Ping chart canvas did not render: ${JSON.stringify(result)}`)
 }
 
 async function auditMobileProbeMatrix() {
@@ -1043,7 +1208,7 @@ async function auditVisitorCollapse() {
 async function auditMobileChromeLayout() {
   visitorInfoEnabledFixture = true
   try {
-    const initScript = `${visitorFixtureInitScript}\nsessionStorage.setItem('leonetlab:intro:1.2.1', 'seen');`
+    const initScript = `${visitorFixtureInitScript}\nsessionStorage.setItem('leonetlab:intro:1.2.2', 'seen');`
     const result = await runInteractivePage('mobile-chrome-layout', 390, 844, mobileChromeLayoutAuditExpression, undefined, initScript)
     reportBrowserAudit('mobile-chrome-layout', result)
     assert.ok(Math.abs(result?.logoWidth - result?.logoHeight) < 0.5, `Mobile logo frame is not square: ${JSON.stringify(result)}`)
@@ -1088,7 +1253,10 @@ try {
     '1',
   )
   await auditGlobeFlagsAcrossThemeChange()
+  await auditGlobeMotionMode('earth', true)
+  await auditGlobeMotionMode('earth-stop', false)
   await auditPingDialogCloseAnimation()
+  await auditPingContentMotion()
   await auditIntroGlobeHandoff()
   await auditMobileProbeMatrix()
   await auditVisitorCollapse()

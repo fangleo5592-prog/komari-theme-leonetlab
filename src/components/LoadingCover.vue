@@ -37,6 +37,10 @@ function prepareHandoff(): boolean {
   root.style.setProperty('--intro-handoff-x', `${targetRect.left - sourceRect.left}px`)
   root.style.setProperty('--intro-handoff-y', `${targetRect.top - sourceRect.top}px`)
   root.style.setProperty('--intro-handoff-scale', `${targetRect.width / sourceRect.width}`)
+  root.style.setProperty('--intro-handoff-source-left', `${sourceRect.left}px`)
+  root.style.setProperty('--intro-handoff-source-top', `${sourceRect.top}px`)
+  root.style.setProperty('--intro-handoff-source-width', `${sourceRect.width}px`)
+  root.style.setProperty('--intro-handoff-source-height', `${sourceRect.height}px`)
   root.classList.add('is-handoff-ready')
   return true
 }
@@ -88,7 +92,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
           variant="intro"
           :interactive="false"
           :show-status="false"
-          :auto-rotate="false"
+          motion="static"
         />
         <div class="lnl-intro-globe-hud" aria-hidden="true">
           <span class="lnl-intro-logo">
@@ -225,14 +229,16 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
 
 .lnl-intro-globe {
   position: relative;
+  grid-column: 1;
   grid-row: 1 / 3;
   width: min(48vw, 52dvh, 510px);
   aspect-ratio: 1;
   justify-self: end;
   opacity: 0;
   transform: translate3d(-12px, 10px, 0) scale(0.92);
+  filter: blur(16px);
   animation: intro-globe-in 1.05s 0.04s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: opacity, transform;
+  will-change: opacity, transform, filter;
 }
 
 .lnl-intro-globe-hud {
@@ -281,6 +287,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
 }
 
 .lnl-intro-copy {
+  grid-column: 2;
   align-self: end;
   min-width: 0;
 }
@@ -321,6 +328,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
 }
 
 .lnl-intro-telemetry {
+  grid-column: 2;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-self: start;
@@ -414,25 +422,44 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
   display: inline-block;
 }
 
-:global(.lnl-intro-exit-leave-active) .lnl-intro-globe {
+.lnl-intro.is-handoff-ready .lnl-intro-globe {
+  position: fixed;
+  z-index: 6;
+  top: var(--intro-handoff-source-top);
+  left: var(--intro-handoff-source-left);
+  grid-row: auto;
+  width: var(--intro-handoff-source-width);
+  height: var(--intro-handoff-source-height);
+  margin: 0;
+  opacity: 1;
+  transform: none;
+  transform-origin: top left;
+  filter: none;
   animation: none;
+}
+
+.lnl-intro.lnl-intro-exit-leave-active .lnl-intro-globe {
+  animation: none;
+  opacity: 1;
+  transform: none;
+  filter: none;
   transition:
     opacity 0.14s 0.7s ease,
     transform 0.84s cubic-bezier(0.2, 0.78, 0.2, 1);
   transform-origin: top left;
 }
-:global(.lnl-intro-exit-leave-to) .lnl-intro-globe {
+.lnl-intro.lnl-intro-exit-leave-to .lnl-intro-globe {
   opacity: 0;
   transform: translate3d(var(--intro-handoff-x, 29vw), var(--intro-handoff-y, 16vh), 0)
     scale(var(--intro-handoff-scale, 0.78));
 }
-:global(.lnl-intro-exit-leave-active)
+.lnl-intro.lnl-intro-exit-leave-active
   :is(.lnl-intro-copy, .lnl-intro-telemetry, .lnl-intro-top, .lnl-intro-bottom, .lnl-intro-progress, .lnl-intro-skip) {
   transition:
     opacity 0.28s ease,
     transform 0.38s ease;
 }
-:global(.lnl-intro-exit-leave-to)
+.lnl-intro.lnl-intro-exit-leave-to
   :is(.lnl-intro-copy, .lnl-intro-telemetry, .lnl-intro-top, .lnl-intro-bottom, .lnl-intro-progress, .lnl-intro-skip) {
   opacity: 0;
   transform: translateY(-8px);
@@ -462,6 +489,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
   to {
     opacity: 1;
     transform: none;
+    filter: blur(0);
   }
 }
 @keyframes intro-copy-in {
@@ -491,11 +519,13 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
     gap: 6px;
   }
   .lnl-intro-globe {
+    grid-column: 1;
     grid-row: auto;
     width: min(86vw, 44dvh, 380px);
     justify-self: center;
   }
   .lnl-intro-copy {
+    grid-column: 1;
     width: 100%;
     text-align: center;
   }
@@ -512,6 +542,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
     font-size: 7px;
   }
   .lnl-intro-telemetry {
+    grid-column: 1;
     width: min(100%, 360px);
     margin-top: 7px;
   }
@@ -528,7 +559,7 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
   .lnl-intro-bottom span:last-child {
     display: none;
   }
-  :global(.lnl-intro-exit-leave-to) .lnl-intro-globe {
+  .lnl-intro.lnl-intro-exit-leave-to .lnl-intro-globe {
     opacity: 0;
     transform: translate3d(var(--intro-handoff-x, 0), var(--intro-handoff-y, -24vh), 0)
       scale(var(--intro-handoff-scale, 1.04));

@@ -34,16 +34,28 @@ if ('serviceWorker' in navigator) {
       if (sessionStorage.getItem(reloadKey) === 'done')
         return
 
-      // Do not interrupt the first-visit handoff with a second full page load.
-      // The new worker already controls the next natural navigation/reload.
-      if (document.querySelector('.lnl-intro')) {
+      const reloadWithNewWorker = () => {
+        if (reloadingForUpdate)
+          return
+        reloadingForUpdate = true
         sessionStorage.setItem(reloadKey, 'done')
+        location.reload()
+      }
+
+      // Let the handoff finish, then reload under the new worker. This keeps
+      // first-visit motion intact without leaving the tab on the old app shell.
+      if (document.querySelector('.lnl-intro')) {
+        const observer = new MutationObserver(() => {
+          if (document.querySelector('.lnl-intro'))
+            return
+          observer.disconnect()
+          window.setTimeout(reloadWithNewWorker, 80)
+        })
+        observer.observe(document.body, { childList: true, subtree: true })
         return
       }
 
-      reloadingForUpdate = true
-      sessionStorage.setItem(reloadKey, 'done')
-      location.reload()
+      reloadWithNewWorker()
     })
 
     navigator.serviceWorker.register('/sw.js', {

@@ -19,7 +19,7 @@ const props = defineProps<{
   variant?: 'dashboard' | 'intro'
   interactive?: boolean
   showStatus?: boolean
-  autoRotate?: boolean
+  motion?: 'auto' | 'static'
 }>()
 
 const appStore = useAppStore()
@@ -37,7 +37,10 @@ const elementVisible = useElementVisibility(containerRef)
 const shouldRender = computed(() => documentVisibility.value === 'visible'
   && elementVisible.value
   && (props.variant === 'intro' || !appStore.introActive))
-const shouldAutoRotate = computed(() => props.autoRotate ?? appStore.earthViewMode !== 'earth-stop')
+// Emerald exposes five layout modes. Only `earth` rotates automatically;
+// `earth-stop` remains draggable but holds its orientation after release.
+const shouldAutoRotate = computed(() => props.motion === 'auto'
+  || (props.motion === undefined && appStore.earthViewMode === 'earth'))
 const interactive = computed(() => props.interactive ?? props.variant !== 'intro')
 const showStatus = computed(() => props.showStatus ?? props.variant !== 'intro')
 
@@ -424,6 +427,22 @@ watch(shouldRender, () => {
   syncRafState()
 })
 
+// The dashboard globe is mounted behind the intro. IntersectionObserver may
+// have reported its state before the cover leaves, so explicitly re-sample the
+// RAF state once the handoff releases the dashboard.
+watch(
+  () => appStore.introActive,
+  async (active) => {
+    if (active || props.variant === 'intro' || !globe)
+      return
+    await nextTick()
+    requestAnimationFrame(() => {
+      updateGlobeFrame()
+      syncRafState()
+    })
+  },
+)
+
 function onPointerDown(e: PointerEvent) {
   if (!interactive.value)
     return
@@ -492,10 +511,11 @@ const offlineServers = computed(() => totalServers.value - onlineServers.value)
       class="earth-globe-canvas pointer-events-none absolute inset-0 w-full h-full select-none"
     />
 
-    <template v-for="cluster in regionClusters" :key="cluster.code">
+    <template v-for="(cluster, clusterIndex) in regionClusters" :key="cluster.code">
       <div
         :ref="bindClusterOverlayRef(cluster.code)"
         class="lnl-earth-overlay absolute -top-3.5 left-0 pointer-events-none"
+        :style="{ '--lnl-marker-index': clusterIndex }"
       >
         <span class="lnl-earth-flag absolute -bottom-2 -left-2 z-3" aria-hidden="true">
           <span>{{ cluster.code }}</span>
@@ -591,5 +611,25 @@ const offlineServers = computed(() => totalServers.value - onlineServers.value)
 
 .node-earth-globe.is-dragging .lnl-earth-overlay {
   transition: none;
+}
+
+.node-earth-globe.is-intro .lnl-earth-overlay {
+  animation: intro-marker-focus 620ms calc(360ms + var(--lnl-marker-index, 0) * 70ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes intro-marker-focus {
+  from {
+    filter: blur(11px);
+  }
+  to {
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node-earth-globe.is-intro .lnl-earth-overlay {
+    animation: none;
+    filter: none;
+  }
 }
 </style>

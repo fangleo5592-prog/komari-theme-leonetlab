@@ -14,7 +14,8 @@ const appStore = useAppStore()
 const isReady = ref(false)
 // Bump this key only when a release intentionally needs to present the intro
 // again. The value still keeps the animation to once per browser session.
-const INTRO_SESSION_KEY = 'leonetlab:intro:1.2.1'
+const INTRO_SESSION_KEY = 'leonetlab:intro:1.2.2'
+const INTRO_HANDOFF_DURATION_MS = 920
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 function shouldPlayIntro(): boolean {
   if (reducedMotion)
@@ -93,7 +94,7 @@ async function finishIntro() {
   showLaunch.value = false
   if (introFinalizeTimer !== null)
     window.clearTimeout(introFinalizeTimer)
-  introFinalizeTimer = window.setTimeout(handleIntroAfterLeave, 980)
+  introFinalizeTimer = window.setTimeout(handleIntroAfterLeave, INTRO_HANDOFF_DURATION_MS + 120)
   try {
     sessionStorage.setItem(INTRO_SESSION_KEY, 'seen')
   }
@@ -139,12 +140,16 @@ onUnmounted(() => {
 <template>
   <Provider>
     <Background v-if="appShellMounted" :paused="!ambientAnimationReady" />
-    <Transition name="lnl-intro-exit" @after-leave="handleIntroAfterLeave">
+    <Transition
+      name="lnl-intro-exit"
+      :duration="{ enter: 0, leave: INTRO_HANDOFF_DURATION_MS }"
+      @after-leave="handleIntroAfterLeave"
+    >
       <LoadingCover v-if="showLaunch" ref="loadingCoverRef" @skip="finishIntro" />
     </Transition>
-    <Header v-if="appShellMounted" :class="{ 'lnl-reveal-header': introRevealActive, 'lnl-header-staged': showLaunch }" />
+    <Header v-if="appShellMounted" :class="{ 'lnl-reveal-header': introRevealActive, 'lnl-header-staged': !introComplete }" />
     <main v-if="appShellMounted && !appStore.loading" class="flex-1">
-      <div class="lnl-shell max-w-[1680px] mx-auto" :class="{ 'lnl-intro-reveal': introRevealActive, 'lnl-intro-staged': showLaunch }">
+      <div class="lnl-shell max-w-[1680px] mx-auto" :class="{ 'lnl-intro-reveal': introRevealActive, 'lnl-intro-staged': !introComplete }">
         <RouterView v-slot="{ Component }">
           <Transition v-bind="pageTransitionProps">
             <KeepAlive :include="['HomeView']">

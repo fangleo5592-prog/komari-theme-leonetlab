@@ -104,6 +104,14 @@ const baseTooltipConfig = computed(() => ({
 // 图表边距配置
 const chartMargin = { top: 30, right: 24, bottom: 32, left: 56 }
 const chartMarginWithLegend = { top: 30, right: 24, bottom: 52, left: 56 }
+const reduceChartMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const chartAnimationConfig = computed(() => ({
+  animation: !appStore.disablePageAnimation && !reduceChartMotion,
+  animationDuration: 520,
+  animationDurationUpdate: 220,
+  animationEasing: 'cubicOut' as const,
+  animationEasingUpdate: 'cubicOut' as const,
+}))
 
 // 视图选项
 const presetViews = [
@@ -361,7 +369,7 @@ const baseYAxisConfig = computed(() => ({
 
 // CPU 图表
 const cpuChartOption = computed(() => ({
-  animation: false,
+  ...chartAnimationConfig.value,
   // 全局颜色配置（确保 Tooltip 圆点颜色与线条一致）
   color: [chartColors.primary, chartColors.secondary],
   tooltip: {
@@ -450,7 +458,7 @@ const cpuChartOption = computed(() => ({
 
 // 内存图表
 const memoryChartOption = computed(() => ({
-  animation: false,
+  ...chartAnimationConfig.value,
   color: [chartColors.primary, chartColors.secondary],
   tooltip: {
     ...baseTooltipConfig.value,
@@ -535,7 +543,7 @@ const memoryChartOption = computed(() => ({
 
 // 磁盘图表
 const diskChartOption = computed(() => ({
-  animation: false,
+  ...chartAnimationConfig.value,
   color: [chartColors.tertiary],
   tooltip: {
     ...baseTooltipConfig.value,
@@ -602,7 +610,7 @@ const diskChartOption = computed(() => ({
 
 // 网络图表
 const networkChartOption = computed(() => ({
-  animation: false,
+  ...chartAnimationConfig.value,
   color: [chartColors.quinary, chartColors.quaternary],
   tooltip: {
     ...baseTooltipConfig.value,
@@ -672,7 +680,7 @@ const networkChartOption = computed(() => ({
 
 // 连接数图表
 const connectionsChartOption = computed(() => ({
-  animation: false,
+  ...chartAnimationConfig.value,
   color: [chartColors.primary, chartColors.tertiary],
   tooltip: {
     ...baseTooltipConfig.value,
@@ -743,7 +751,7 @@ const connectionsChartOption = computed(() => ({
 
 // 进程数图表
 const processChartOption = computed(() => ({
-  animation: false,
+  ...chartAnimationConfig.value,
   color: [chartColors.quaternary],
   tooltip: {
     ...baseTooltipConfig.value,

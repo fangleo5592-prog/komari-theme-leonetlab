@@ -632,7 +632,11 @@ const pingChartOption = computed(() => {
   })
 
   return {
-    animation: false,
+    animation: !appStore.disablePageAnimation,
+    animationDuration: 560,
+    animationDurationUpdate: 240,
+    animationEasing: 'cubicOut' as const,
+    animationEasingUpdate: 'cubicOut' as const,
     // 全局颜色设置（用于图例等）
     color: tasks.value.map((_, idx) => {
       const safeIdx = Math.max(0, idx % chartColors.length)
@@ -758,7 +762,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="lnl-ping-panel">
+  <div class="lnl-ping-panel" :class="{ 'is-motion-enabled': !appStore.disablePageAnimation }">
     <div class="lnl-ping-toolbar">
       <div class="lnl-ping-window">
         <span>OBSERVATION WINDOW</span>
@@ -811,10 +815,11 @@ onUnmounted(() => {
             </div>
             <div class="lnl-ping-probe-list">
               <div
-                v-for="task in latestValues" :key="task.id"
+                v-for="(task, taskIndex) in latestValues" :key="task.id"
                 role="button" tabindex="0"
                 class="lnl-ping-probe"
                 :class="{ 'is-disabled': !selectedTaskIds.includes(task.id) }"
+                :style="{ '--lnl-probe-index': taskIndex }"
                 @click="toggleTask(task.id)"
                 @keydown.enter.prevent="toggleTask(task.id)"
                 @keydown.space.prevent="toggleTask(task.id)"
@@ -919,6 +924,41 @@ onUnmounted(() => {
 .lnl-ping-panel > * {
   position: relative;
   z-index: 1;
+}
+.lnl-ping-panel.is-motion-enabled .lnl-ping-toolbar {
+  animation: ping-section-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.lnl-ping-panel.is-motion-enabled .lnl-ping-probes-head {
+  animation: ping-section-in 420ms 70ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.lnl-ping-panel.is-motion-enabled .lnl-ping-probe {
+  animation: ping-section-in 440ms calc(100ms + var(--lnl-probe-index, 0) * 55ms) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.lnl-ping-panel.is-motion-enabled .lnl-ping-plot-head {
+  animation: ping-section-in 440ms 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.lnl-ping-panel.is-motion-enabled .lnl-ping-chart {
+  animation: ping-chart-in 560ms 230ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes ping-section-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ping-chart-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .lnl-ping-toolbar {
   display: flex;
@@ -1198,6 +1238,12 @@ onUnmounted(() => {
 @media (max-width: 520px) {
   .lnl-ping-probe-meta span:nth-child(2) {
     display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lnl-ping-panel.is-motion-enabled
+    :is(.lnl-ping-toolbar, .lnl-ping-probes-head, .lnl-ping-probe, .lnl-ping-plot-head, .lnl-ping-chart) {
+    animation: none;
   }
 }
 </style>
