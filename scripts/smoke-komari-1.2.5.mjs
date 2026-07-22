@@ -155,6 +155,22 @@ let visitorInfoEnabledFixture = false
 const leadingSlashesPattern = /^\/+/
 const lineBreakPattern = /\r?\n/
 
+async function readDevToolsPort(activePortFile, deadline) {
+  let lastError
+  while (Date.now() < deadline) {
+    try {
+      const [port] = readFileSync(activePortFile, 'utf8').trim().split(lineBreakPattern)
+      if (port)
+        return port
+    }
+    catch (error) {
+      lastError = error
+    }
+    await new Promise(resolveWait => setTimeout(resolveWait, 50))
+  }
+  throw lastError ?? new Error('Chrome DevTools port file stayed empty')
+}
+
 const mime = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -366,7 +382,7 @@ async function runInteractivePage(name, width, height, expression, screenshotNam
       await new Promise(resolveWait => setTimeout(resolveWait, 50))
     assert.ok(existsSync(activePortFile), 'Chrome DevTools port was not created')
 
-    const [port] = readFileSync(activePortFile, 'utf8').trim().split(lineBreakPattern)
+    const port = await readDevToolsPort(activePortFile, deadline)
     const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then(response => response.json())
     const target = targets.find(item => item.type === 'page')
     assert.ok(target?.webSocketDebuggerUrl, 'Chrome page target was not available')
@@ -557,6 +573,92 @@ const themeModeAuditExpression = `new Promise((resolve) => {
   }, 80);
 })`
 
+const globeFlagThemeAuditExpression = `new Promise((resolve) => {
+  const deadline = Date.now() + 12000;
+  const timer = setInterval(() => {
+    const canvas = document.querySelector('.node-earth-globe:not(.is-intro) canvas');
+    const overlays = [...document.querySelectorAll('.node-earth-globe:not(.is-intro) .lnl-earth-overlay')];
+    const themeButton = [...document.querySelectorAll('button')].find(button => /模式|北京时间/.test(button.getAttribute('aria-label') || ''));
+    if (canvas && overlays.length === 2 && themeButton) {
+      clearInterval(timer);
+      const initialCanvas = canvas;
+      const initialCount = overlays.length;
+      const sample = () => {
+        const current = [...document.querySelectorAll('.node-earth-globe:not(.is-intro) .lnl-earth-overlay')];
+        const images = current.map(overlay => overlay.querySelector('img'));
+        return {
+          count: current.length,
+          loaded: images.every(image => image?.complete && image.naturalWidth > 0),
+          displayed: images.every(image => getComputedStyle(image).display !== 'none'),
+        };
+      };
+      const samples = [sample()];
+      themeButton.click();
+      const start = performance.now();
+      const capture = () => {
+        samples.push(sample());
+        if (performance.now() - start < 950) {
+          requestAnimationFrame(capture);
+          return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        canvas.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7, clientX: rect.left + rect.width * 0.5, clientY: rect.top + rect.height * 0.5 }));
+        canvas.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 7, clientX: rect.left + rect.width * 0.7, clientY: rect.top + rect.height * 0.52 }));
+        canvas.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7, clientX: rect.left + rect.width * 0.7, clientY: rect.top + rect.height * 0.52 }));
+        requestAnimationFrame(() => resolve({
+          initialCount,
+          canvasSame: initialCanvas === document.querySelector('.node-earth-globe:not(.is-intro) canvas'),
+          minCount: Math.min(...samples.map(item => item.count)),
+          allLoaded: samples.every(item => item.loaded),
+          allDisplayed: samples.every(item => item.displayed),
+          draggingEnded: !document.querySelector('.node-earth-globe:not(.is-intro)')?.classList.contains('is-dragging'),
+        }));
+      };
+      requestAnimationFrame(capture);
+    }
+    else if (Date.now() >= deadline) {
+      clearInterval(timer);
+      resolve({ state: 'timeout', overlays: overlays.length });
+    }
+  }, 80);
+})`
+
+const mobileChromeLayoutAuditExpression = `new Promise((resolve) => {
+  const deadline = Date.now() + 12000;
+  const intersects = (a, b) => Boolean(a && b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top);
+  const timer = setInterval(() => {
+    const logo = document.querySelector('.lnl-identity-mark');
+    const visitor = document.querySelector('.lnl-visitor-trigger');
+    const backTop = document.querySelector('.lnl-back-top');
+    if (logo && visitor && backTop) {
+      clearInterval(timer);
+      window.scrollTo(0, Math.min(500, document.documentElement.scrollHeight));
+      setTimeout(() => {
+        const logoRect = logo.getBoundingClientRect();
+        const compactVisitorRect = visitor.getBoundingClientRect();
+        const compactBackRect = backTop.getBoundingClientRect();
+        visitor.click();
+        setTimeout(() => {
+          const expandedVisitorRect = visitor.getBoundingClientRect();
+          const expandedBackRect = backTop.getBoundingClientRect();
+          resolve({
+            logoWidth: logoRect.width,
+            logoHeight: logoRect.height,
+            compactOverlap: intersects(compactVisitorRect, compactBackRect),
+            expandedOverlap: intersects(expandedVisitorRect, expandedBackRect),
+            documentWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+            viewportWidth: document.documentElement.clientWidth,
+          });
+        }, 520);
+      }, 180);
+    }
+    else if (Date.now() >= deadline) {
+      clearInterval(timer);
+      resolve({ state: 'timeout' });
+    }
+  }, 80);
+})`
+
 const mobileProbeMatrixAuditExpression = `new Promise((resolve) => {
   const deadline = Date.now() + 12000;
   const timer = setInterval(() => {
@@ -686,13 +788,13 @@ const visitorFixtureInitScript = `(() => {
 })()`
 
 async function capturePingDialogScreenshot(name, width, height) {
-  const result = await runInteractivePage(name, width, height, pingDialogOpenExpression, name)
+  const result = await runInteractivePage(name, width, height, pingDialogOpenExpression, name, `sessionStorage.setItem('leonetlab:intro:1.2.0', 'seen');`)
   assert.equal(result, 'opened')
 }
 
 async function auditMobileFinanceOverflow(width) {
   const screenshotName = process.env.SMOKE_SCREENSHOT_DIR && width === 390 ? 'mobile-finance-open' : undefined
-  const result = await runInteractivePage(`mobile-finance-audit-${width}`, width, 844, financeOverflowAuditExpression, screenshotName)
+  const result = await runInteractivePage(`mobile-finance-audit-${width}`, width, 844, financeOverflowAuditExpression, screenshotName, `sessionStorage.setItem('leonetlab:intro:1.2.0', 'seen');`)
   assert.equal(result?.state, 'opened')
   assert.equal(result?.viewportWidth, width)
   assert.ok(result?.documentWidth <= result?.viewportWidth, `Mobile document overflowed: ${JSON.stringify(result)}`)
@@ -736,6 +838,24 @@ async function auditConfiguredThemeMode(defaultMode, expectedDark, initScript, e
   }
 }
 
+async function auditGlobeFlagsAcrossThemeChange() {
+  const result = await runInteractivePage(
+    'globe-flags-theme-change',
+    1100,
+    780,
+    globeFlagThemeAuditExpression,
+    undefined,
+    `sessionStorage.setItem('leonetlab:intro:1.2.0', 'seen'); localStorage.setItem('appearance', 'light'); localStorage.setItem('leonetlab:appearance:user-override', '1');`,
+  )
+  reportBrowserAudit('globe-flags-theme-change', result)
+  assert.equal(result?.initialCount, 2, `Expected two globe flag overlays: ${JSON.stringify(result)}`)
+  assert.equal(result?.canvasSame, true, `Theme switch recreated the globe canvas: ${JSON.stringify(result)}`)
+  assert.equal(result?.minCount, 2, `Globe flags disappeared during theme switch: ${JSON.stringify(result)}`)
+  assert.equal(result?.allLoaded, true, `A globe flag asset failed to load: ${JSON.stringify(result)}`)
+  assert.equal(result?.allDisplayed, true, `A globe flag was hidden: ${JSON.stringify(result)}`)
+  assert.equal(result?.draggingEnded, true, `Globe drag state did not settle: ${JSON.stringify(result)}`)
+}
+
 async function auditMobileProbeMatrix() {
   const result = await runInteractivePage('mobile-probe-matrix', 390, 844, mobileProbeMatrixAuditExpression)
   reportBrowserAudit('mobile-probe-matrix', result)
@@ -759,6 +879,22 @@ async function auditVisitorCollapse() {
     // the smaller per-frame distance observed at 60 fps. An actual snap remains
     // several times faster than the CSS transition and still fails this bound.
     assert.ok(result?.maxHeightVelocity < 2.5, `Visitor collapse height changed too abruptly: ${JSON.stringify(result)}`)
+  }
+  finally {
+    visitorInfoEnabledFixture = false
+  }
+}
+
+async function auditMobileChromeLayout() {
+  visitorInfoEnabledFixture = true
+  try {
+    const initScript = `${visitorFixtureInitScript}\nsessionStorage.setItem('leonetlab:intro:1.2.0', 'seen');`
+    const result = await runInteractivePage('mobile-chrome-layout', 390, 844, mobileChromeLayoutAuditExpression, undefined, initScript)
+    reportBrowserAudit('mobile-chrome-layout', result)
+    assert.ok(Math.abs(result?.logoWidth - result?.logoHeight) < 0.5, `Mobile logo frame is not square: ${JSON.stringify(result)}`)
+    assert.equal(result?.compactOverlap, false, `Compact visitor card overlaps back-to-top: ${JSON.stringify(result)}`)
+    assert.equal(result?.expandedOverlap, false, `Expanded visitor card overlaps back-to-top: ${JSON.stringify(result)}`)
+    assert.ok(result?.documentWidth <= result?.viewportWidth, `Mobile chrome overflowed horizontally: ${JSON.stringify(result)}`)
   }
   finally {
     visitorInfoEnabledFixture = false
@@ -789,8 +925,10 @@ try {
     `localStorage.setItem('appearance', 'dark'); localStorage.setItem('leonetlab:appearance:user-override', '1');`,
     '1',
   )
+  await auditGlobeFlagsAcrossThemeChange()
   await auditMobileProbeMatrix()
   await auditVisitorCollapse()
+  await auditMobileChromeLayout()
 
   const detailHtml = await dumpDom('detail', `/instance/${nodeUuid}`, 8000)
   assert.match(detailHtml, /资源与系统记录/)

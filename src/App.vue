@@ -14,7 +14,7 @@ const appStore = useAppStore()
 const isReady = ref(false)
 // Bump this key only when a release intentionally needs to present the intro
 // again. The value still keeps the animation to once per browser session.
-const INTRO_SESSION_KEY = 'leonetlab:intro:1.1.8'
+const INTRO_SESSION_KEY = 'leonetlab:intro:1.2.0'
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 function shouldPlayIntro(): boolean {
   if (reducedMotion)
@@ -28,13 +28,14 @@ function shouldPlayIntro(): boolean {
 }
 
 const introWillPlay = shouldPlayIntro()
+appStore.introActive = introWillPlay
 const showLaunch = ref(introWillPlay)
 const introComplete = ref(!introWillPlay)
 const appShellMounted = ref(!introWillPlay)
 const ambientAnimationReady = ref(!introWillPlay)
 const introRevealActive = ref(false)
 const launchStartedAt = performance.now()
-const launchMinimumMs = introWillPlay ? 3100 : 0
+const launchMinimumMs = introWillPlay ? 3200 : 0
 let introFinalizeTimer: ReturnType<typeof window.setTimeout> | null = null
 let introRevealTimer: ReturnType<typeof window.setTimeout> | null = null
 let ambientStartTimer: ReturnType<typeof window.setTimeout> | null = null
@@ -58,12 +59,15 @@ onMounted(async () => {
           import('@/views/HomeView.vue'),
           import('@/components/NodeCard.vue'),
           import('@/components/NodeGeneralCards.vue'),
-          import('@/components/NodeEarthGlobe.vue'),
         ])
       : Promise.resolve()
     await Promise.all([initApp(), preloadHomeVisuals])
     await nextTick()
     isReady.value = true
+    // Mount the real dashboard underneath the intro once data is ready. This
+    // lets the intro globe hand off to an already-rendered dashboard globe.
+    if (introWillPlay)
+      appShellMounted.value = true
   }
   catch (error) {
     console.error('[App] Initialization failed:', error)
@@ -76,10 +80,22 @@ onMounted(async () => {
 })
 
 function finishIntro() {
+  if (!showLaunch.value && introWillPlay)
+    return
+  appShellMounted.value = true
+  introRevealActive.value = true
   showLaunch.value = false
   if (introFinalizeTimer !== null)
     window.clearTimeout(introFinalizeTimer)
   introFinalizeTimer = window.setTimeout(handleIntroAfterLeave, 700)
+  introRevealTimer = window.setTimeout(() => {
+    introRevealActive.value = false
+  }, 1500)
+  ambientStartTimer = window.setTimeout(() => {
+    window.requestAnimationFrame(() => {
+      ambientAnimationReady.value = true
+    })
+  }, 420)
   try {
     sessionStorage.setItem(INTRO_SESSION_KEY, 'seen')
   }
@@ -96,19 +112,12 @@ function handleIntroAfterLeave() {
     introFinalizeTimer = null
   }
   introComplete.value = true
-  introRevealActive.value = true
+  appStore.introActive = false
   appShellMounted.value = true
-  introRevealTimer = window.setTimeout(() => {
-    introRevealActive.value = false
-  }, 1500)
-  ambientStartTimer = window.setTimeout(() => {
-    window.requestAnimationFrame(() => {
-      ambientAnimationReady.value = true
-    })
-  }, 420)
 }
 
 onUnmounted(() => {
+  appStore.introActive = false
   if (introFinalizeTimer !== null)
     window.clearTimeout(introFinalizeTimer)
   if (introRevealTimer !== null)

@@ -38,7 +38,7 @@
   --font-sans: 'Aptos', 'Noto Sans SC', 'Microsoft YaHei UI', sans-serif;
   --font-display: Georgia, 'Noto Serif SC', 'Songti SC', serif;
   --font-mono: 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
-  --lnl-green: #3ca778;
+  --lnl-green: #167a56;
   --lnl-cyan: #4a9eaa;
   --lnl-line: rgba(33, 104, 78, 0.25);
   --lnl-surface: rgba(242, 249, 245, 0.78);
@@ -257,8 +257,13 @@ textarea {
 }
 .lnl-identity-mark {
   width: 39px;
+  height: 39px;
   aspect-ratio: 1;
   flex: 0 0 39px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
   padding: 4px;
   border: 1px solid var(--lnl-line);
   background: var(--lnl-surface);
@@ -269,6 +274,10 @@ textarea {
   height: 100%;
   display: block;
   object-fit: contain;
+}
+.lnl-identity-mark > span {
+  color: var(--lnl-green);
+  font: 600 17px/1 var(--font-display);
 }
 .lnl-identity-copy {
   min-width: 0;
@@ -699,6 +708,22 @@ textarea {
   }
   .lnl-identity-copy b {
     font-size: 17px;
+  }
+  .lnl-identity-mark {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+  }
+  .lnl-back-top {
+    right: max(14px, env(safe-area-inset-right)) !important;
+    bottom: max(80px, calc(env(safe-area-inset-bottom) + 72px)) !important;
+    transition:
+      bottom 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+      color 0.2s ease,
+      background-color 0.2s ease !important;
+  }
+  body:has(.lnl-visitor.is-presenting, .lnl-visitor.is-expanded) .lnl-back-top {
+    bottom: max(216px, calc(env(safe-area-inset-bottom) + 208px)) !important;
   }
   .lnl-dashboard-head {
     grid-template-columns: 1fr;

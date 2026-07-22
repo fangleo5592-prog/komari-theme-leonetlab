@@ -1,11 +1,11 @@
-const CACHE_NAME = 'leonetlab-observatory-v1.1.9'
+const CACHE_NAME = 'leonetlab-observatory-v1.2.0'
 const OFFLINE_URL = '/offline.html'
 const CORE_ASSETS = [
   OFFLINE_URL,
   '/manifest.webmanifest',
   '/icons/pwa-192.png',
   '/icons/pwa-512.png',
-  '/images/logo/leonetlab.png',
+  '/favicon.ico',
 ]
 
 globalThis.addEventListener('install', (event) => {

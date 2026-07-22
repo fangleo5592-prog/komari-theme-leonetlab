@@ -35,6 +35,7 @@ coverage
 docs/audit-*.png
 docs/audit-*/
 docs/chrome-smoke.png
+artifacts/
 
 .env.development
 # Cypress

@@ -49,7 +49,6 @@ const debouncedSearchText = ref('')
 const selectedPingNodeUuid = ref<string | null>(null)
 const onlineNodeCount = computed(() => nodesStore.nodes.filter(node => node.online).length)
 const totalNodeCount = computed(() => nodesStore.nodes.length)
-const stationName = computed(() => appStore.publicSettings?.sitename || 'Komari Monitor')
 
 const updateDebouncedSearch = useDebounceFn((value: string) => {
   debouncedSearchText.value = value
@@ -147,11 +146,11 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
   <div class="home-view">
     <section class="lnl-dashboard-head" aria-labelledby="overview-title">
       <div>
-        <span class="lnl-kicker">GLOBAL NETWORK / LIVE OBSERVATION</span>
+        <span class="lnl-kicker">{{ appStore.brandHeroKicker }}</span>
         <h1 id="overview-title">
-          全球节点观测
+          {{ appStore.brandHeroTitle }}
         </h1>
-        <p>{{ stationName }} 的实时状态、资源占用与网络质量。</p>
+        <p>{{ appStore.brandHeroDescription }}</p>
       </div>
       <dl class="lnl-dashboard-status">
         <div><dt>ONLINE</dt><dd>{{ onlineNodeCount }}<span>/ {{ totalNodeCount }}</span></dd></div>
@@ -194,7 +193,7 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
               <TabsList :class="pickSurfaceClass('w-max h-8 bg-background/60 rounded-md', 'w-max h-8 bg-background/50 backdrop-blur-xl rounded-md')">
                 <TabsTrigger
                   v-for="g in groups" :key="g.name" :value="g.name"
-                  class="h-6.5 flex-none shrink-0 text-xs border-none data-[state=active]:text-emerald-600 shadow-none rounded-sm"
+                  class="h-6.5 flex-none shrink-0 text-xs border-none data-[state=active]:text-emerald-800 dark:data-[state=active]:text-emerald-300 shadow-none rounded-sm"
                 >
                   {{ g.tab }}
                 </TabsTrigger>
@@ -204,7 +203,7 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
               <Button
                 variant="outline" size="icon" aria-label="卡片视图"
                 class="h-8 w-8 border-none shadow-none rounded-md"
-                :class="[pickSurfaceClass('bg-background hover:bg-background/95', 'bg-background/50 hover:bg-background/60 backdrop-blur-xs'), appStore.nodeViewMode === 'card' ? '!text-emerald-600 !bg-background' : '']"
+                :class="[pickSurfaceClass('bg-background hover:bg-background/95', 'bg-background/50 hover:bg-background/60 backdrop-blur-xs'), appStore.nodeViewMode === 'card' ? '!text-emerald-800 dark:!text-emerald-300 !bg-background' : '']"
                 @click="appStore.nodeViewMode = 'card'"
               >
                 <Icon icon="tabler:layout-grid" :width="14" :height="14" />
@@ -212,7 +211,7 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
               <Button
                 variant="outline" size="icon" aria-label="列表视图"
                 class="h-8 w-8 border-none shadow-none rounded-md"
-                :class="[pickSurfaceClass('bg-background hover:bg-background/95', 'bg-background/50 hover:bg-background/60 backdrop-blur-xs'), appStore.nodeViewMode === 'list' ? '!text-emerald-600 !bg-background' : '']"
+                :class="[pickSurfaceClass('bg-background hover:bg-background/95', 'bg-background/50 hover:bg-background/60 backdrop-blur-xs'), appStore.nodeViewMode === 'list' ? '!text-emerald-800 dark:!text-emerald-300 !bg-background' : '']"
                 @click="appStore.nodeViewMode = 'list'"
               >
                 <Icon icon="tabler:table" :width="14" :height="14" />

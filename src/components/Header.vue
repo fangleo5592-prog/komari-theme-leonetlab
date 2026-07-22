@@ -13,6 +13,7 @@ const themeTransition = ref<{ target: 'light' | 'dark', phase: 'covering' | 'rev
 const leavingForAdmin = ref(false)
 const transitionTimers: number[] = []
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const logoVisible = ref(true)
 
 const actionButtons = computed(() => {
   const buttons = [{
@@ -81,21 +82,32 @@ function handleButtonClick(action: string) {
 
 onUnmounted(() => transitionTimers.forEach(timer => window.clearTimeout(timer)))
 
-const sitename = computed(() => appStore.publicSettings?.sitename || 'Komari Monitor')
+function handleLogoError(event: Event) {
+  const image = event.currentTarget as HTMLImageElement
+  if (image.dataset.fallback !== '1' && image.src !== new URL('/favicon.ico', location.href).href) {
+    image.dataset.fallback = '1'
+    image.src = '/favicon.ico'
+    return
+  }
+  logoVisible.value = false
+}
 </script>
 
 <template>
   <header class="lnl-header" :class="{ 'is-scrolled': isScrolled }">
     <div class="lnl-header-inner max-w-[1680px] mx-auto">
-      <button class="lnl-identity" type="button" aria-label="返回监控总览" @click="router.push('/')">
-        <span class="lnl-identity-mark"><img src="/images/logo/leonetlab.png" alt=""></span>
+      <button class="lnl-identity" type="button" title="返回监控总览" @click="router.push('/')">
+        <span class="lnl-identity-mark">
+          <img v-if="logoVisible" :src="appStore.brandLogoUrl" alt="" @error="handleLogoError">
+          <span v-else aria-hidden="true">{{ appStore.brandShortName.slice(0, 1).toUpperCase() }}</span>
+        </span>
         <span class="lnl-identity-copy">
-          <b>{{ sitename }}</b>
-          <small>LEONETLAB / NETWORK OBSERVATORY</small>
+          <b>{{ appStore.brandName }}</b>
+          <small>{{ appStore.brandShortName.toUpperCase() }} / {{ appStore.brandHeaderSubtitle }}</small>
         </span>
       </button>
       <div class="lnl-header-state" aria-hidden="true">
-        <i /> LIVE TELEMETRY
+        <i /> {{ appStore.brandStatusLabel }}
       </div>
       <nav class="lnl-header-actions" aria-label="页面操作">
         <DataTooltip v-for="button in actionButtons" :key="button.action" :content="button.title" placement="left" content-class="whitespace-nowrap text-[11px] px-2">
@@ -116,7 +128,7 @@ const sitename = computed(() => appStore.publicSettings?.sitename || 'Komari Mon
     <div v-if="leavingForAdmin" class="lnl-route-cover" role="status" aria-live="polite">
       <div class="lnl-route-grid" aria-hidden="true" />
       <div class="lnl-route-core" aria-hidden="true">
-        <i /><span><img src="/images/logo/leonetlab.png" alt=""></span><i />
+        <i /><span><img v-if="logoVisible" :src="appStore.brandLogoUrl" alt="" @error="handleLogoError"></span><i />
       </div>
       <div class="lnl-route-copy">
         <span>SECURE HANDOFF / LOCAL CONSOLE</span>

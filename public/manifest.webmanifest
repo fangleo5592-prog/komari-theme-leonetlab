@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "LeoNetLab Observatory",
-  "short_name": "LeoNetLab",
-  "description": "LeoNetLab global network telemetry observatory powered by Komari Monitor.",
+  "name": "Komari Network Observatory",
+  "short_name": "Komari",
+  "description": "A live network telemetry observatory powered by Komari Monitor.",
   "lang": "zh-CN",
   "dir": "ltr",
   "start_url": "/",

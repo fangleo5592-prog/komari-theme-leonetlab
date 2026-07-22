@@ -1,6 +1,6 @@
 # LeoNetLab Observatory for Komari
 
-与 LeoNetLab 个人站视觉统一的 Komari Monitor 监控主题。主题保留 Komari Emerald 的数据、图表、节点详情、WebSocket/HTTP 回退与响应式地球实现，重新设计了站点外壳、颜色、排版、节点卡片、首访动画、纯点阵数字海洋和移动端布局。
+面向 Komari Monitor 的可换品牌网络观测主题。默认保留 LeoNetLab 的观测站视觉，同时允许站长在 Komari 后台替换站点名、主副标题、状态词、首访文案和 Logo。主题保留 Komari Emerald 的数据、图表、节点详情、WebSocket/HTTP 回退与响应式地球实现，并重新设计站点外壳、颜色、排版、节点卡片、首访动画、纯点阵数字海洋和移动端布局。
 
 1.1.2 起提供 PWA Manifest、192/512 图标、动态浏览器主题色与保守的离线链路页。Service Worker 只缓存主题静态资源，不缓存 Komari API、后台页面或实时节点响应；PWA 安装需要通过 HTTPS（本地开发可使用 localhost）访问。
 
@@ -23,7 +23,7 @@ bun run build
 构建完成后会生成：
 
 - `dist/`
-- `komari-theme-leonetlab-build-v1.1.9.zip`
+- `komari-theme-leonetlab-build-v1.2.0.zip`
 
 兼容性与构建检查：
 
@@ -32,7 +32,16 @@ npm run validate
 npm run smoke:1.2.5
 ```
 
-`smoke:1.2.5` 会启动本地模拟接口并用无界面 Chrome/Edge 验证 1.2.5-fix1 数组节点响应、fix2/1.2.7 对象兼容、历史记录 RPC 回退、详情分区和 Ping 数据能够实际渲染。
+`smoke:1.2.5` 会启动本地模拟接口并用无界面 Chrome/Edge 验证 1.2.5-fix1 数组节点响应、fix2/1.2.7 对象兼容、历史记录 RPC 回退、详情分区和 Ping 数据能够实际渲染；同时检查地球国旗在明暗切换与拖动期间不丢失、移动端 Logo 保持正方形，以及访客卡片不会与返回顶部按钮重叠。
+
+## 1.2.0 更新摘要
+
+- 地球明暗切换改为在同一 WebGL 实例上原地更新配色，不再销毁和重建 Canvas；新增逐帧回归，验证切换和拖动期间国旗 DOM、图片加载与显示状态持续稳定。
+- 首访动画直接复用首页的 cobe 点阵地球和真实节点区域数据，展示在线、离线与传输模式；退场时地球向首页位置收束，页头、摘要和节点卡片按层级浮现，并暂停被遮挡的首页地球以降低双 WebGL 动画负担。
+- 后台新增完整的“品牌与文案”配置：显示名、短名、Logo、页头副标题/状态词、首页眉题/主标题/说明、首访文案和页脚观测词均可替换。默认 Logo 走 Komari 官方 `/favicon.ico`，运行时 PWA Manifest 与 Apple Touch Icon 也跟随品牌设置。
+- 修复手机端访客扫描与返回顶部按钮重叠；返回顶部按钮会按访客卡片的紧凑/展开状态自动避让。手机页头 Logo 框固定为严格正方形，并对长品牌名保持安全截断。
+- Service Worker 升级到 1.2.0 缓存命名；静态 PWA 清单使用通用 Komari 名称，实时 API、后台与用户数据仍不进入缓存。
+- 对照 Komari 1.2.5-fix1、1.2.5-fix2、1.2.7 官方接口以及官方主题市场校验规则完成兼容审计。安装 ZIP 保持根目录清单、版本/short 一致和单 Release 单 ZIP，便于 Komari 后台与主题市场更新器直接拉取。
 
 ## 1.1.9 更新摘要
 

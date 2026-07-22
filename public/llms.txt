@@ -1,0 +1,9 @@
+# Komari Network Observatory
+
+This site is a public, read-only server status dashboard powered by Komari Monitor.
+
+- The homepage summarizes node availability, resource use, traffic, and network quality.
+- Node detail pages present public historical telemetry when the server administrator enables records.
+- The management console at `/admin` is not part of the public theme.
+
+Project references: [Komari Monitor](https://github.com/komari-monitor/komari) and [LeoNetLab Observatory theme](https://github.com/fangleo5592-prog/komari-theme-leonetlab).

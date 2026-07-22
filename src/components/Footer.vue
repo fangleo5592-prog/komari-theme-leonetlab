@@ -34,7 +34,7 @@ onMounted(async () => {
   />
   <footer class="lnl-footer max-w-[1680px] mx-auto" :class="{ 'has-visitor': appStore.visitorInfoCardEnabled }">
     <div class="lnl-footer-rule">
-      <span>EDGE / OBSERVATION COMPLETE</span><i />
+      <span>{{ appStore.brandFooterEyebrow }}</span><i />
     </div>
     <div v-if="showFiling" class="lnl-filing">
       <a v-if="showIcp" :href="appStore.icpUrl" target="_blank" rel="noopener noreferrer">{{ appStore.icpNumber }}</a>

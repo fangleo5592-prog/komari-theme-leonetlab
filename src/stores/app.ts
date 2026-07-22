@@ -42,6 +42,7 @@ function isValidEarthViewMode(value: unknown): value is EarthViewMode {
 
 const useAppStore = defineStore('app', () => {
   const loading = ref<boolean>(true)
+  const introActive = ref<boolean>(false)
 
   // appearance 会被存储组件自动写入，不能仅凭它是否存在来判断访客是否
   // 手动选择过主题。单独的 override 标记只由页头切换操作写入。
@@ -49,6 +50,25 @@ const useAppStore = defineStore('app', () => {
   const hasThemeModeOverride = ref(localStorage.getItem(THEME_MODE_OVERRIDE_KEY) === '1')
   const lang = useStorageAsync<Lang>('language', 'zh-CN', localStorage)
   const publicSettings = ref<PublicSettings>()
+  const readThemeString = (key: string, fallback = ''): string => {
+    const value = publicSettings.value?.theme_settings?.[key]
+    return typeof value === 'string' && value.trim() ? value.trim() : fallback
+  }
+
+  // Branding is intentionally sourced from Komari's public site settings/theme settings.
+  // /favicon.ico is Komari's official favicon route and automatically prefers the
+  // administrator-uploaded icon over the icon bundled with this theme.
+  const brandName = computed(() => readThemeString('brandName', publicSettings.value?.sitename?.trim() || 'Komari Monitor'))
+  const brandShortName = computed(() => readThemeString('brandShortName', brandName.value))
+  const brandLogoUrl = computed(() => readThemeString('brandLogoUrl', '/favicon.ico'))
+  const brandHeaderSubtitle = computed(() => readThemeString('brandHeaderSubtitle', 'NETWORK OBSERVATORY'))
+  const brandStatusLabel = computed(() => readThemeString('brandStatusLabel', 'LIVE TELEMETRY'))
+  const brandHeroKicker = computed(() => readThemeString('brandHeroKicker', 'GLOBAL NETWORK / LIVE OBSERVATION'))
+  const brandHeroTitle = computed(() => readThemeString('brandHeroTitle', '全球节点观测'))
+  const brandHeroDescription = computed(() => readThemeString('brandHeroDescription', `${brandName.value} 的实时状态、资源占用与网络质量。`))
+  const brandIntroEyebrow = computed(() => readThemeString('brandIntroEyebrow', 'NETWORK OBSERVATORY / GLOBAL EDGE'))
+  const brandIntroSubtitle = computed(() => readThemeString('brandIntroSubtitle', '正在同步实时节点状态'))
+  const brandFooterEyebrow = computed(() => readThemeString('brandFooterEyebrow', 'EDGE / OBSERVATION COMPLETE'))
   const beijingClock = ref(Date.now())
   window.setInterval(() => {
     beijingClock.value = Date.now()
@@ -345,6 +365,7 @@ const useAppStore = defineStore('app', () => {
 
   return {
     loading,
+    introActive,
     themeMode,
     hasThemeModeOverride,
     defaultThemeMode,
@@ -378,6 +399,17 @@ const useAppStore = defineStore('app', () => {
     backgroundOverlay,
     isLoggedIn,
     publicSettings,
+    brandName,
+    brandShortName,
+    brandLogoUrl,
+    brandHeaderSubtitle,
+    brandStatusLabel,
+    brandHeroKicker,
+    brandHeroTitle,
+    brandHeroDescription,
+    brandIntroEyebrow,
+    brandIntroSubtitle,
+    brandFooterEyebrow,
     connectionError,
     homeScrollPosition,
     updateThemeMode,

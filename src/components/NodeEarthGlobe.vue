@@ -16,6 +16,9 @@ import { getCoordByCode, getCountryCodeFromRegion } from '@/utils/geoHelper'
 
 const props = defineProps<{
   nodes?: NodeData[]
+  variant?: 'dashboard' | 'intro'
+  interactive?: boolean
+  showStatus?: boolean
 }>()
 
 const appStore = useAppStore()
@@ -30,8 +33,12 @@ const { width: containerWidth, height: containerHeight } = useElementSize(contai
 
 const documentVisibility = useDocumentVisibility()
 const elementVisible = useElementVisibility(containerRef)
-const shouldRender = computed(() => documentVisibility.value === 'visible' && elementVisible.value)
+const shouldRender = computed(() => documentVisibility.value === 'visible'
+  && elementVisible.value
+  && (props.variant === 'intro' || !appStore.introActive))
 const shouldAutoRotate = computed(() => appStore.earthViewMode !== 'earth-stop')
+const interactive = computed(() => props.interactive ?? props.variant !== 'intro')
+const showStatus = computed(() => props.showStatus ?? props.variant !== 'intro')
 
 let globe: Globe | null = null
 const INITIAL_THETA = 0.22
@@ -260,7 +267,7 @@ function buildInitialOptions(): COBEOptions {
     theta,
     dark: colors.dark,
     diffuse: 1.2,
-    mapSamples: 10000, // 地图采样点数，默认 16000
+    mapSamples: props.variant === 'intro' ? 7200 : 10000,
     mapBrightness: colors.mapBrightness,
     baseColor: colors.baseColor,
     markerColor: colors.markerColor,
@@ -351,11 +358,6 @@ function stopGlobe() {
   }
 }
 
-function rebuildGlobe() {
-  stopGlobe()
-  startGlobe()
-}
-
 onMounted(() => {
   startGlobe()
 })
@@ -364,9 +366,22 @@ onBeforeUnmount(() => {
   stopGlobe()
 })
 
-// 切换主题时重建 globe
+// Theme changes must update the existing WebGL instance in place. Recreating
+// cobe briefly detaches its canvas wrapper and desynchronizes the DOM flags.
 watch(() => appStore.isDark, () => {
-  rebuildGlobe()
+  if (!globe)
+    return
+  const colors = themeColors.value
+  globe.update({
+    dark: colors.dark,
+    mapBrightness: colors.mapBrightness,
+    baseColor: colors.baseColor,
+    markerColor: colors.markerColor,
+    glowColor: colors.glowColor,
+  })
+  triggerStaticRedrawWindow(900)
+  updateGlobeFrame()
+  syncRafState()
 })
 
 watch(
@@ -409,6 +424,8 @@ watch(shouldRender, () => {
 })
 
 function onPointerDown(e: PointerEvent) {
+  if (!interactive.value)
+    return
   isPointerDown = true
   dragging.value = true
   lastPointerX = e.clientX
@@ -418,7 +435,7 @@ function onPointerDown(e: PointerEvent) {
   syncRafState()
 }
 function onPointerMove(e: PointerEvent) {
-  if (!isPointerDown)
+  if (!interactive.value || !isPointerDown)
     return
   const deltaX = e.clientX - lastPointerX
   const deltaY = e.clientY - lastPointerY
@@ -428,6 +445,8 @@ function onPointerMove(e: PointerEvent) {
   targetTheta = clampTheta(targetTheta + deltaY / 300)
 }
 function onPointerUp(e: PointerEvent) {
+  if (!interactive.value)
+    return
   isPointerDown = false
   dragging.value = false
   const target = e.currentTarget as HTMLElement
@@ -448,12 +467,13 @@ const offlineServers = computed(() => totalServers.value - onlineServers.value)
 
 <template>
   <div
-    ref="containerRef" class="node-earth-globe relative aspect-square w-full mx-auto -translate-y-6 md:-translate-y-12"
-    :class="{ 'is-dragging': dragging }"
+    ref="containerRef" class="node-earth-globe relative aspect-square w-full mx-auto"
+    :class="[{ 'is-dragging': dragging, 'is-intro': variant === 'intro' }, variant === 'intro' ? '' : '-translate-y-6 md:-translate-y-12']"
   >
     <canvas
       ref="canvasRef"
-      class="earth-globe-canvas absolute inset-0 w-full h-full select-none touch-none cursor-grab active:cursor-grabbing"
+      class="earth-globe-canvas absolute inset-0 w-full h-full select-none"
+      :class="interactive ? 'touch-none cursor-grab active:cursor-grabbing' : 'pointer-events-none'"
       @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerup="onPointerUp" @pointercancel="onPointerUp"
     />
 
@@ -483,7 +503,7 @@ const offlineServers = computed(() => totalServers.value - onlineServers.value)
     </template>
 
     <div
-      v-if="totalServers > 0"
+      v-if="showStatus && totalServers > 0"
       class="absolute top-6 md:top-12 left-0 text-[10px] text-muted-foreground pointer-events-none flex gap-2 items-center backdrop-blur-lg bg-background/60 rounded px-2 py-0.5"
     >
       <div v-if="onlineServers > 0" class="flex items-center gap-1">
@@ -510,6 +530,11 @@ const offlineServers = computed(() => totalServers.value - onlineServers.value)
 .node-earth-globe {
   width: min(100%, clamp(360px, 32vw, 500px));
   max-width: 500px;
+}
+
+.node-earth-globe.is-intro {
+  width: 100%;
+  max-width: none;
 }
 
 @media (max-width: 760px) {
@@ -540,10 +565,12 @@ const offlineServers = computed(() => totalServers.value - onlineServers.value)
   width: 100%;
   height: 100%;
   object-fit: contain;
+  transform: translateZ(0);
 }
 
 .lnl-earth-overlay {
-  transition: opacity 90ms linear;
+  backface-visibility: hidden;
+  transition: opacity 70ms linear;
   will-change: transform, opacity;
 }
 

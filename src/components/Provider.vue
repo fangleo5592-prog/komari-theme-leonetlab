@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { provide, ref, watch } from 'vue'
+import { onUnmounted, provide, ref, watch } from 'vue'
 import { BackTop } from '@/components/ui/back-top'
 import { useAppStore } from '@/stores/app'
 
@@ -7,6 +7,7 @@ const appStore = useAppStore()
 
 const isScrolled = ref(false)
 provide('isScrolled', isScrolled)
+let dynamicManifestUrl = ''
 
 watch(
   () => appStore.isDark,
@@ -21,6 +22,46 @@ watch(
   },
   { immediate: true },
 )
+
+watch(
+  [() => appStore.brandName, () => appStore.brandShortName, () => appStore.brandLogoUrl, () => appStore.brandHeroDescription, () => appStore.isDark],
+  ([name, shortName, logoUrl, description, dark]) => {
+    document.querySelector<HTMLMetaElement>('meta[name="application-name"]')
+      ?.setAttribute('content', name)
+    document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')
+      ?.setAttribute('href', logoUrl)
+
+    const manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
+    if (!manifestLink)
+      return
+    if (dynamicManifestUrl)
+      URL.revokeObjectURL(dynamicManifestUrl)
+    dynamicManifestUrl = URL.createObjectURL(new Blob([JSON.stringify({
+      id: '/',
+      name,
+      short_name: shortName,
+      description,
+      lang: 'zh-CN',
+      dir: 'ltr',
+      start_url: '/',
+      scope: '/',
+      display: 'standalone',
+      display_override: ['standalone', 'minimal-ui'],
+      orientation: 'any',
+      background_color: dark ? '#030b09' : '#edf7f1',
+      theme_color: dark ? '#04100d' : '#edf7f1',
+      categories: ['utilities', 'productivity'],
+      icons: [{ src: logoUrl, sizes: 'any', purpose: 'any' }],
+    })], { type: 'application/manifest+json' }))
+    manifestLink.href = dynamicManifestUrl
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  if (dynamicManifestUrl)
+    URL.revokeObjectURL(dynamicManifestUrl)
+})
 
 watch(
   () => appStore.backgroundEnabled,

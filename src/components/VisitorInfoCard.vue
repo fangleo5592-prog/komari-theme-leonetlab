@@ -59,6 +59,7 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 let presentationStarted = false
 const presentationActive = computed(() => ['entering', 'scanning', 'verified', 'collapsing'].includes(presentationState.value))
 const isExpanded = computed(() => expand.value || presentationActive.value)
+const keepExpandedRows = computed(() => isExpanded.value || presentationState.value === 'compacting')
 
 const subtitle = computed(() => loading.value ? '检测中' : location.value || '网络访客')
 const flagSrc = computed(() => countryCode.value ? `/images/flags/${countryCode.value}.svg` : '')
@@ -99,7 +100,7 @@ const visitorRows = computed<VisitorInfoRow[]>(() => [
     expandOnly: true,
   },
 ])
-const visibleRows = computed(() => visitorRows.value.filter(item => isExpanded.value || !item.expandOnly))
+const visibleRows = computed(() => visitorRows.value.filter(item => keepExpandedRows.value || !item.expandOnly))
 
 function startPresentation() {
   if (presentationStarted || !props.presentOnReady || reducedMotion || !props.introComplete || loading.value)
@@ -466,7 +467,7 @@ onUnmounted(() => presentationTimers.forEach(timer => window.clearTimeout(timer)
         tag="div"
         name="visitor-pill"
         class="lnl-visitor-rows"
-        :class="[isExpanded ? 'grid grid-cols-2 items-start justify-start gap-x-3 gap-y-2' : 'flex flex-nowrap items-center justify-center gap-x-3 gap-y-1']"
+        :class="[keepExpandedRows ? 'grid grid-cols-2 items-start justify-start gap-x-3 gap-y-2' : 'flex flex-nowrap items-center justify-center gap-x-3 gap-y-1']"
       >
         <div
           v-for="(item, index) in visibleRows" :key="item.icon"
@@ -566,7 +567,7 @@ onUnmounted(() => presentationTimers.forEach(timer => window.clearTimeout(timer)
 
 .lnl-visitor.is-collapsing .lnl-visitor-trigger,
 .lnl-visitor.is-compacting .lnl-visitor-trigger {
-  will-change: width, height, padding;
+  will-change: height, transform;
 }
 
 .lnl-visitor.is-presenting .lnl-visitor-rows,
@@ -762,6 +763,11 @@ onUnmounted(() => presentationTimers.forEach(timer => window.clearTimeout(timer)
   .lnl-visitor-rows {
     flex: 1;
     justify-content: flex-start !important;
+  }
+
+  .lnl-visitor.is-presenting .lnl-visitor-trigger,
+  .lnl-visitor.is-expanded .lnl-visitor-trigger {
+    height: min(190px, calc(100dvh - 124px));
   }
 }
 

@@ -260,7 +260,7 @@ onMounted(async () => {
           class="group h-full border-none rounded-md transition-all"
           :class="pickSurfaceClass('bg-background/60 hover:bg-background', 'bg-background/50 hover:bg-background backdrop-blur-xs')"
           content-class="h-full !p-3" role="button" tabindex="0" aria-controls="lnl-finance-popover"
-          aria-label="查看财务汇率详情" :aria-expanded="openFinanceCard" data-finance-trigger
+          title="查看财务汇率详情" :aria-expanded="openFinanceCard" data-finance-trigger
           @click="openFinanceCard = !openFinanceCard"
           @keydown.enter.prevent="openFinanceCard = !openFinanceCard"
           @keydown.space.prevent="openFinanceCard = !openFinanceCard"

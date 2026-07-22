@@ -1,47 +1,37 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import NodeEarthGlobe from '@/components/NodeEarthGlobe.vue'
 import { useAppStore } from '@/stores/app'
+import { useNodesStore } from '@/stores/nodes'
 
 const emit = defineEmits<{ skip: [] }>()
 const appStore = useAppStore()
-const regions = [
-  { code: 'HK', className: 'n1' },
-  { code: 'JP', className: 'n2' },
-  { code: 'US', className: 'n3' },
-  { code: 'SG', className: 'n4' },
-  { code: 'UK', className: 'n5' },
-  { code: 'FR', className: 'n6' },
-  { code: 'DE', className: 'n7' },
-  { code: 'ZA', className: 'n8' },
-]
-
-const phases = [
-  'EDGE DISCOVERY',
-  'ROUTE NEGOTIATION',
-  'SESSION SYNCHRONIZED',
-  'CONSOLE READY',
-]
+const nodesStore = useNodesStore()
 const phaseIndex = ref(0)
+const logoVisible = ref(true)
 const timers: number[] = []
-const viewportWidth = window.innerWidth
-const viewportHeight = window.innerHeight
-const landscapeCompact = viewportHeight < 560 && viewportWidth > viewportHeight
-const mobile = viewportWidth < 680
-const globeSize = landscapeCompact
-  ? Math.min(viewportHeight * 0.66, 320)
-  : mobile
-    ? Math.min(viewportWidth * 0.72, viewportHeight * 0.43, 330)
-    : Math.min(viewportWidth * 0.46, viewportHeight * 0.48, 480)
-const titleSize = mobile
-  ? Math.max(40, Math.min(viewportWidth * 0.13, 58))
-  : Math.max(42, Math.min(viewportWidth * 0.07, viewportHeight * 0.085, 78))
-const introStyle = computed(() => ({
-  '--lnl-intro-globe': `${Math.max(190, globeSize)}px`,
-  '--lnl-intro-title': `${titleSize}px`,
-}))
+const phases = computed(() => [
+  appStore.brandIntroSubtitle,
+  '正在建立实时数据链路',
+  '正在校准全球节点坐标',
+  '观测界面已就绪',
+])
+const totalNodes = computed(() => nodesStore.nodes.length)
+const onlineNodes = computed(() => nodesStore.nodes.filter(node => node.online).length)
+const offlineNodes = computed(() => Math.max(0, totalNodes.value - onlineNodes.value))
+
+function handleLogoError(event: Event) {
+  const image = event.currentTarget as HTMLImageElement
+  if (image.dataset.fallback !== '1' && image.src !== new URL('/favicon.ico', location.href).href) {
+    image.dataset.fallback = '1'
+    image.src = '/favicon.ico'
+    return
+  }
+  logoVisible.value = false
+}
 
 onMounted(() => {
-  ;[620, 1450, 2350].forEach((delay, index) => {
+  ;[620, 1420, 2260].forEach((delay, index) => {
     timers.push(window.setTimeout(() => {
       phaseIndex.value = index + 1
     }, delay))
@@ -53,50 +43,63 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
 
 <template>
   <div
-    class="lnl-intro" :class="appStore.isDark ? 'lnl-intro-dark' : 'lnl-intro-light'"
-    :style="introStyle" role="status" aria-live="polite" aria-label="正在连接监控数据"
+    class="lnl-intro"
+    :class="appStore.isDark ? 'lnl-intro-dark' : 'lnl-intro-light'"
+    role="status"
+    aria-live="polite"
+    aria-label="正在连接监控数据"
   >
     <div class="lnl-intro-grid" aria-hidden="true" />
     <div class="lnl-intro-ocean" aria-hidden="true" />
+
     <div class="lnl-intro-top" aria-hidden="true">
-      <span>LNL / MONITOR SESSION</span><span>08 REGIONS · EDGE READY</span>
+      <span>{{ appStore.brandShortName.toUpperCase() }} / MONITOR SESSION</span>
+      <span>{{ onlineNodes }} ONLINE · {{ totalNodes }} NODES</span>
     </div>
+
     <div class="lnl-intro-scene">
-      <div class="lnl-intro-globe" aria-hidden="true">
-        <svg viewBox="0 0 600 600" focusable="false">
-          <circle class="sphere" cx="300" cy="300" r="248" />
-          <ellipse class="meridian" cx="300" cy="300" rx="118" ry="248" />
-          <ellipse class="latitude" cx="300" cy="300" rx="248" ry="104" />
-          <path class="route r1" pathLength="1" d="M300 54 Q202 151 300 300" />
-          <path class="route r2" pathLength="1" d="M466 118 Q420 232 300 300" />
-          <path class="route r3" pathLength="1" d="M548 288 Q430 268 300 300" />
-          <path class="route r4" pathLength="1" d="M456 492 Q401 384 300 300" />
-          <path class="route r5" pathLength="1" d="M300 546 Q326 409 300 300" />
-          <path class="route r6" pathLength="1" d="M128 478 Q204 395 300 300" />
-          <path class="route r7" pathLength="1" d="M52 292 Q179 265 300 300" />
-          <path class="route r8" pathLength="1" d="M134 120 Q207 221 300 300" />
-        </svg>
-        <span v-for="region in regions" :key="region.code" class="lnl-intro-node" :class="region.className"><i />{{ region.code }}</span>
-        <div class="lnl-intro-core">
-          <span><img src="/images/logo/leonetlab.png" alt=""></span>
-          <small>TELEMETRY READY</small>
+      <div class="lnl-intro-globe">
+        <NodeEarthGlobe
+          :nodes="nodesStore.earthNodes"
+          variant="intro"
+          :interactive="false"
+          :show-status="false"
+        />
+        <div class="lnl-intro-globe-hud" aria-hidden="true">
+          <span class="lnl-intro-logo">
+            <img v-if="logoVisible" :src="appStore.brandLogoUrl" alt="" @error="handleLogoError">
+            <b v-else>{{ appStore.brandShortName.slice(0, 1).toUpperCase() }}</b>
+          </span>
+          <span><i /> LIVE NODE MAP</span>
         </div>
       </div>
+
       <div class="lnl-intro-copy">
-        <span>PRIVATE OBSERVATORY / GLOBAL EDGE</span>
-        <strong>LeoNetLab</strong>
+        <span>{{ appStore.brandIntroEyebrow }}</span>
+        <strong>{{ appStore.brandName }}</strong>
         <p>
           <Transition name="phase" mode="out-in">
             <span :key="phases[phaseIndex]">{{ phases[phaseIndex] }}</span>
           </Transition>
         </p>
       </div>
+
+      <dl class="lnl-intro-telemetry">
+        <div><dt>ONLINE</dt><dd>{{ onlineNodes }}<small>/{{ totalNodes }}</small></dd></div>
+        <div><dt>OFFLINE</dt><dd>{{ offlineNodes }}</dd></div>
+        <div>
+          <dt>TRANSPORT</dt><dd class="is-text">
+            {{ appStore.rpcTransportMode.toUpperCase() }}
+          </dd>
+        </div>
+      </dl>
     </div>
+
     <div class="lnl-intro-progress">
       <i />
     </div>
     <div class="lnl-intro-bottom" aria-hidden="true">
-      <span>NEGOTIATING EDGE SESSION</span><span>HK · JP · US · SG · UK · FR · DE · ZA</span>
+      <span>LIVE TOPOLOGY SYNCHRONIZATION</span><span>THEME / {{ appStore.resolvedThemeMode.toUpperCase() }}</span>
     </div>
     <button class="lnl-intro-skip" type="button" @click="emit('skip')">
       跳过
@@ -106,349 +109,235 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
 
 <style scoped>
 .lnl-intro {
-  --lnl-intro-globe: clamp(210px, min(46vw, 48dvh), 480px);
-  --lnl-intro-title: clamp(42px, min(7vw, 8.5dvh), 78px);
   --intro-bg: #030b09;
   --intro-ink: #e5eee9;
   --intro-muted: #91a79e;
-  --intro-dim: #789087;
   --intro-accent: #74e6b2;
   --intro-cyan: #75c9d4;
-  --intro-surface: #071310;
   position: fixed;
-  inset: 0;
   z-index: 100;
+  inset: 0;
   display: grid;
   place-items: center;
   overflow: hidden;
   contain: layout paint style;
+  isolation: isolate;
   background: var(--intro-bg);
   color: var(--intro-ink);
-  isolation: isolate;
 }
+
 .lnl-intro-light {
   --intro-bg: #edf6f1;
   --intro-ink: #10251d;
   --intro-muted: #506c61;
-  --intro-dim: #668077;
   --intro-accent: #167a56;
   --intro-cyan: #227f89;
-  --intro-surface: #f7fbf8;
 }
-.lnl-intro::before {
-  content: '';
-  position: absolute;
-  inset: -20%;
-  background:
-    radial-gradient(circle at 50% 43%, color-mix(in srgb, var(--intro-accent) 14%, transparent), transparent 26rem),
-    linear-gradient(112deg, transparent 25%, color-mix(in srgb, var(--intro-cyan) 7%, transparent) 50%, transparent 72%);
-  animation: lnl-sweep 2.8s cubic-bezier(0.22, 1, 0.36, 1) both;
-  will-change: opacity, transform;
-}
-.lnl-intro-grid {
+
+.lnl-intro-grid,
+.lnl-intro-ocean {
   position: absolute;
   inset: 0;
+  pointer-events: none;
+}
+
+.lnl-intro-grid {
   background-image:
     linear-gradient(color-mix(in srgb, var(--intro-accent) 5%, transparent) 1px, transparent 1px),
     linear-gradient(90deg, color-mix(in srgb, var(--intro-accent) 5%, transparent) 1px, transparent 1px);
-  background-size: 42px 42px;
-  mask-image: radial-gradient(circle at 50% 46%, #000, transparent 74%);
-  animation: lnl-grid 1.15s ease both;
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at 50% 44%, #000, transparent 76%);
+  animation: intro-grid-in 1s ease both;
 }
+
 .lnl-intro-ocean {
-  position: absolute;
-  z-index: 1;
-  right: -18%;
-  bottom: -40%;
-  left: -18%;
-  height: 92%;
-  opacity: 0;
-  background-image:
-    radial-gradient(circle, color-mix(in srgb, var(--intro-accent) 86%, transparent) 0 1px, transparent 1.25px),
-    radial-gradient(circle, color-mix(in srgb, var(--intro-cyan) 32%, transparent) 0 0.7px, transparent 1px);
-  background-position:
-    0 0,
-    12px 9px;
-  background-size: 24px 18px;
-  transform: perspective(540px) rotateX(63deg) translate3d(0, 13%, 0) scale(1.06);
-  transform-origin: 50% 0;
-  mask-image: linear-gradient(transparent 2%, #000 22%, #000 72%, transparent 96%);
-  animation: lnl-intro-ocean 3.2s cubic-bezier(0.18, 0.68, 0.22, 1) both;
-  will-change: opacity, transform;
+  inset: auto -14% -47%;
+  height: 84%;
+  opacity: 0.22;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--intro-accent) 72%, transparent) 0 1px,
+    transparent 1.25px
+  );
+  background-size: 22px 17px;
+  mask-image: linear-gradient(transparent, #000 25%, transparent 92%);
+  transform: perspective(560px) rotateX(65deg) translate3d(0, 8%, 0);
+  transform-origin: top;
+  animation: intro-ocean 3.2s cubic-bezier(0.2, 0.72, 0.2, 1) both;
 }
-.lnl-intro-ocean::after {
-  content: '';
-  position: absolute;
-  inset: 18% 8% 20%;
-  border: 1px solid color-mix(in srgb, var(--intro-cyan) 13%, transparent);
-  border-width: 1px 0 0;
-  border-radius: 50%;
-  box-shadow: 0 -18px 44px color-mix(in srgb, var(--intro-accent) 5%, transparent);
-  transform: rotate(-5deg);
-  animation: lnl-intro-current 2.8s ease-in-out both;
-}
+
 .lnl-intro-top,
 .lnl-intro-bottom {
   position: absolute;
   z-index: 5;
-  right: max(24px, env(safe-area-inset-right));
-  left: max(24px, env(safe-area-inset-left));
+  right: max(22px, env(safe-area-inset-right));
+  left: max(22px, env(safe-area-inset-left));
   display: flex;
   justify-content: space-between;
-  color: var(--intro-dim);
-  font:
-    10px/1.4 ui-monospace,
-    SFMono-Regular,
-    Consolas,
-    monospace;
-  letter-spacing: 0.16em;
+  color: var(--intro-muted);
+  font: 9px/1.4 var(--font-mono);
+  letter-spacing: 0.14em;
 }
+
 .lnl-intro-top {
-  top: max(22px, env(safe-area-inset-top));
+  top: max(20px, env(safe-area-inset-top));
 }
 .lnl-intro-bottom {
-  bottom: max(18px, env(safe-area-inset-bottom));
+  bottom: max(17px, env(safe-area-inset-bottom));
   font-size: 8px;
 }
+
 .lnl-intro-scene {
   position: relative;
   z-index: 3;
   display: grid;
-  justify-items: center;
-  gap: clamp(12px, 2vh, 22px);
+  width: min(92vw, 980px);
+  grid-template-columns: minmax(300px, 1.08fr) minmax(280px, 0.92fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 12px clamp(26px, 5vw, 70px);
 }
+
 .lnl-intro-globe {
   position: relative;
-  width: var(--lnl-intro-globe);
+  grid-row: 1 / 3;
+  width: min(48vw, 52dvh, 510px);
   aspect-ratio: 1;
-  flex: none;
+  justify-self: end;
   opacity: 0;
-  transform: translate3d(0, 10px, 0) scale(0.9) rotate(-4deg);
-  animation: lnl-globe 1.05s 0.05s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform: translate3d(-12px, 10px, 0) scale(0.92);
+  animation: intro-globe-in 1.05s 0.04s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: opacity, transform;
 }
-.lnl-intro-globe::before {
-  content: '';
+
+.lnl-intro-globe-hud {
   position: absolute;
-  inset: 4%;
-  border: 1px solid color-mix(in srgb, var(--intro-accent) 9%, transparent);
-  border-radius: 50%;
-  box-shadow:
-    0 0 55px color-mix(in srgb, var(--intro-accent) 5%, transparent),
-    inset 0 0 48px color-mix(in srgb, var(--intro-cyan) 4%, transparent);
+  right: 7%;
+  bottom: 10%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--intro-accent) 24%, transparent);
+  background: color-mix(in srgb, var(--intro-bg) 82%, transparent);
+  color: var(--intro-muted);
+  font: 7px/1 var(--font-mono);
+  letter-spacing: 0.11em;
 }
-.lnl-intro-globe svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-.lnl-intro-globe :is(.sphere, .meridian, .latitude) {
-  fill: none;
-  stroke: color-mix(in srgb, var(--intro-cyan) 22%, transparent);
-  stroke-width: 1.2;
-  vector-effect: non-scaling-stroke;
-}
-.lnl-intro-globe .sphere {
-  stroke: color-mix(in srgb, var(--intro-accent) 34%, transparent);
-}
-.lnl-intro-globe .meridian {
-  stroke-dasharray: 4 6;
-}
-.lnl-intro-globe .latitude {
-  stroke-dasharray: 2 7;
-}
-.route {
-  fill: none;
-  stroke: var(--intro-accent);
-  stroke-width: 1.35;
-  stroke-linecap: round;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  vector-effect: non-scaling-stroke;
-  opacity: 0.72;
-  animation: lnl-route 0.78s cubic-bezier(0.2, 0.72, 0.2, 1) forwards;
-}
-.r1 {
-  animation-delay: 0.24s;
-}
-.r2 {
-  animation-delay: 0.31s;
-}
-.r3 {
-  animation-delay: 0.38s;
-}
-.r4 {
-  animation-delay: 0.45s;
-}
-.r5 {
-  animation-delay: 0.52s;
-}
-.r6 {
-  animation-delay: 0.59s;
-}
-.r7 {
-  animation-delay: 0.66s;
-}
-.r8 {
-  animation-delay: 0.73s;
-}
-.lnl-intro-node {
-  position: absolute;
-  z-index: 3;
+
+.lnl-intro-globe-hud > span:last-child {
   display: flex;
   align-items: center;
   gap: 5px;
-  color: var(--intro-muted);
-  font:
-    8px ui-monospace,
-    SFMono-Regular,
-    Consolas,
-    monospace;
-  letter-spacing: 0.11em;
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.7);
-  animation: lnl-node 0.44s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-.lnl-intro-node i {
-  width: 6px;
-  height: 6px;
+.lnl-intro-globe-hud i {
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--intro-accent);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--intro-accent) 55%, transparent);
+  box-shadow: 0 0 10px var(--intro-accent);
 }
-.n1 {
-  left: 50%;
-  top: 9%;
-  animation-delay: 0.31s;
-}
-.n2 {
-  left: 79%;
-  top: 20%;
-  animation-delay: 0.38s;
-}
-.n3 {
-  left: 91%;
-  top: 49%;
-  animation-delay: 0.45s;
-}
-.n4 {
-  left: 78%;
-  top: 82%;
-  animation-delay: 0.52s;
-}
-.n5 {
-  left: 50%;
-  top: 92%;
-  animation-delay: 0.59s;
-}
-.n6 {
-  left: 22%;
-  top: 81%;
-  animation-delay: 0.66s;
-}
-.n7 {
-  left: 9%;
-  top: 49%;
-  animation-delay: 0.73s;
-}
-.n8 {
-  left: 22%;
-  top: 20%;
-  animation-delay: 0.8s;
-}
-.n2,
-.n3,
-.n4 {
-  flex-direction: row-reverse;
-}
-.lnl-intro-core {
-  position: absolute;
-  z-index: 5;
-  left: 50%;
-  top: 50%;
+.lnl-intro-logo {
   display: grid;
-  justify-items: center;
-  gap: 8px;
-  transform: translate(-50%, -50%);
-  color: var(--intro-muted);
-  font:
-    8px ui-monospace,
-    SFMono-Regular,
-    Consolas,
-    monospace;
-  letter-spacing: 0.12em;
-  white-space: nowrap;
-}
-.lnl-intro-core > span {
-  width: 76px;
-  height: 76px;
-  box-sizing: border-box;
-  overflow: hidden;
+  width: 28px;
   aspect-ratio: 1;
-  padding: 7px;
-  border: 1px solid color-mix(in srgb, var(--intro-accent) 40%, transparent);
-  border-radius: 19px;
-  background: var(--intro-surface);
-  box-shadow:
-    0 0 0 8px color-mix(in srgb, var(--intro-bg) 76%, transparent),
-    0 0 34px color-mix(in srgb, var(--intro-accent) 10%, transparent);
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--intro-accent) 32%, transparent);
 }
-.lnl-intro-core img {
+.lnl-intro-logo img {
   display: block;
   width: 100%;
   height: 100%;
-  border-radius: 12px;
   object-fit: contain;
 }
+.lnl-intro-logo b {
+  font: 600 13px/1 var(--font-display);
+}
+
 .lnl-intro-copy {
-  display: grid;
-  justify-items: center;
-  text-align: center;
+  align-self: end;
+  min-width: 0;
 }
 .lnl-intro-copy > span,
 .lnl-intro-copy > p {
-  font:
-    9px ui-monospace,
-    SFMono-Regular,
-    Consolas,
-    monospace;
-  letter-spacing: 0.15em;
+  font: 9px/1.6 var(--font-mono);
+  letter-spacing: 0.13em;
 }
 .lnl-intro-copy > span {
   color: var(--intro-accent);
 }
 .lnl-intro-copy > strong {
-  font:
-    400 var(--lnl-intro-title)/0.98 Georgia,
-    'Noto Serif SC',
-    serif;
-  letter-spacing: -0.055em;
+  display: block;
+  max-width: 100%;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+  font: 400 clamp(40px, 5.8vw, 74px)/0.98 var(--font-display);
+  letter-spacing: -0.045em;
 }
 .lnl-intro-copy > p {
-  margin: 8px 0 0;
+  min-height: 1.6em;
+  margin: 12px 0 0;
   color: var(--intro-muted);
 }
 .lnl-intro-copy > * {
   opacity: 0;
-  transform: translateY(8px);
-  animation: lnl-copy 0.54s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transform: translateY(9px);
+  animation: intro-copy-in 0.56s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 .lnl-intro-copy > span {
-  animation-delay: 0.74s;
+  animation-delay: 0.58s;
 }
 .lnl-intro-copy > strong {
-  animation-delay: 0.84s;
+  animation-delay: 0.7s;
 }
 .lnl-intro-copy > p {
-  animation-delay: 1.02s;
+  animation-delay: 0.84s;
 }
+
+.lnl-intro-telemetry {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-self: start;
+  margin: 10px 0 0;
+  border-block: 1px solid color-mix(in srgb, var(--intro-accent) 18%, transparent);
+  opacity: 0;
+  animation: intro-copy-in 0.6s 0.98s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.lnl-intro-telemetry div {
+  min-width: 0;
+  padding: 12px 10px;
+  border-right: 1px solid color-mix(in srgb, var(--intro-accent) 15%, transparent);
+}
+.lnl-intro-telemetry div:last-child {
+  border-right: 0;
+}
+.lnl-intro-telemetry dt {
+  color: var(--intro-muted);
+  font: 7px var(--font-mono);
+  letter-spacing: 0.12em;
+}
+.lnl-intro-telemetry dd {
+  margin: 5px 0 0;
+  color: var(--intro-accent);
+  font: 600 20px/1 var(--font-mono);
+}
+.lnl-intro-telemetry dd.is-text {
+  font-size: 10px;
+  line-height: 20px;
+}
+.lnl-intro-telemetry small {
+  margin-left: 3px;
+  color: var(--intro-muted);
+  font-size: 9px;
+}
+
 .lnl-intro-progress {
   position: absolute;
   z-index: 5;
   right: max(24px, 7vw);
-  bottom: max(42px, calc(env(safe-area-inset-bottom) + 26px));
+  bottom: max(40px, calc(env(safe-area-inset-bottom) + 25px));
   left: max(24px, 7vw);
   height: 1px;
   background: color-mix(in srgb, var(--intro-muted) 17%, transparent);
@@ -460,208 +349,192 @@ onUnmounted(() => timers.forEach(timer => window.clearTimeout(timer)))
   background: linear-gradient(90deg, var(--intro-accent), var(--intro-cyan));
   transform: scaleX(0);
   transform-origin: left;
-  animation: lnl-track 3.1s cubic-bezier(0.2, 0.72, 0.2, 1) forwards;
+  animation: intro-track 3.1s cubic-bezier(0.2, 0.72, 0.2, 1) forwards;
 }
 .lnl-intro-skip {
   position: absolute;
   z-index: 8;
   right: max(24px, env(safe-area-inset-right));
-  bottom: max(44px, calc(env(safe-area-inset-bottom) + 28px));
+  bottom: max(42px, calc(env(safe-area-inset-bottom) + 27px));
   padding: 7px 10px;
-  border: 1px solid color-mix(in srgb, var(--intro-accent) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--intro-accent) 24%, transparent);
   border-radius: 0;
-  background: color-mix(in srgb, var(--intro-bg) 72%, transparent);
+  background: color-mix(in srgb, var(--intro-bg) 78%, transparent);
   color: var(--intro-muted);
-  font:
-    9px/1 ui-monospace,
-    SFMono-Regular,
-    Consolas,
-    monospace;
+  font: 9px/1 var(--font-mono);
   letter-spacing: 0.12em;
   cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    color 0.2s ease;
 }
 .lnl-intro-skip:hover,
 .lnl-intro-skip:focus-visible {
-  border-color: color-mix(in srgb, var(--intro-accent) 58%, transparent);
+  border-color: var(--intro-accent);
   color: var(--intro-accent);
 }
+
 .phase-enter-active,
 .phase-leave-active {
   transition:
-    opacity 0.22s ease,
-    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.lnl-intro-copy > p span {
-  display: inline-block;
+    opacity 0.2s ease,
+    transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .phase-enter-from {
   opacity: 0;
-  transform: translateY(5px);
+  transform: translateY(4px);
 }
 .phase-leave-to {
   opacity: 0;
   transform: translateY(-4px);
 }
-@keyframes lnl-sweep {
+.lnl-intro-copy > p span {
+  display: inline-block;
+}
+
+:global(.lnl-intro-exit-leave-active) .lnl-intro-globe {
+  animation: none;
+  transition:
+    opacity 0.54s ease,
+    transform 0.66s cubic-bezier(0.22, 1, 0.36, 1);
+}
+:global(.lnl-intro-exit-leave-to) .lnl-intro-globe {
+  opacity: 0.1;
+  transform: translate3d(29vw, 16vh, 0) scale(0.78);
+}
+:global(.lnl-intro-exit-leave-active)
+  :is(.lnl-intro-copy, .lnl-intro-telemetry, .lnl-intro-top, .lnl-intro-bottom, .lnl-intro-progress, .lnl-intro-skip) {
+  transition:
+    opacity 0.28s ease,
+    transform 0.38s ease;
+}
+:global(.lnl-intro-exit-leave-to)
+  :is(.lnl-intro-copy, .lnl-intro-telemetry, .lnl-intro-top, .lnl-intro-bottom, .lnl-intro-progress, .lnl-intro-skip) {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+@keyframes intro-grid-in {
   from {
     opacity: 0;
-    transform: translate3d(-14%, 0, 0);
-  }
-  35% {
-    opacity: 1;
+    transform: scale(1.02);
   }
   to {
-    opacity: 0.3;
-    transform: translate3d(14%, 0, 0);
+    opacity: 0.9;
+    transform: none;
   }
 }
-@keyframes lnl-grid {
+@keyframes intro-ocean {
   from {
     opacity: 0;
-    transform: scale(1.025);
+    transform: perspective(560px) rotateX(65deg) translate3d(0, 14%, 0);
   }
   to {
-    opacity: 0.85;
-    transform: scale(1);
+    opacity: 0.22;
+    transform: perspective(560px) rotateX(65deg) translate3d(0, -7%, 0);
   }
 }
-@keyframes lnl-globe {
+@keyframes intro-globe-in {
   to {
     opacity: 1;
     transform: none;
   }
 }
-@keyframes lnl-route {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-@keyframes lnl-node {
-  to {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-}
-@keyframes lnl-copy {
+@keyframes intro-copy-in {
   to {
     opacity: 1;
     transform: none;
   }
 }
-@keyframes lnl-track {
+@keyframes intro-track {
   0% {
     transform: scaleX(0.015);
   }
-  70% {
-    transform: scaleX(0.8);
+  72% {
+    transform: scaleX(0.82);
   }
   to {
     transform: scaleX(1);
   }
 }
-@keyframes lnl-intro-ocean {
-  from {
-    opacity: 0;
-    transform: perspective(540px) rotateX(63deg) translate3d(0, 13%, 0) scale(1.06);
-  }
-  24% {
-    opacity: 0.5;
-  }
-  to {
-    opacity: 0.22;
-    transform: perspective(540px) rotateX(63deg) translate3d(0, -8%, 0) scale(0.96);
-  }
-}
-@keyframes lnl-intro-current {
-  from {
-    opacity: 0;
-    transform: translate3d(-8%, 18%, 0) rotate(-7deg) scaleX(0.72);
-  }
-  36% {
-    opacity: 0.7;
-  }
-  to {
-    opacity: 0.12;
-    transform: translate3d(7%, -14%, 0) rotate(-3deg) scaleX(1.08);
-  }
-}
+
 @media (max-width: 680px) {
-  .lnl-intro {
-    --lnl-intro-globe: clamp(190px, min(72vw, 43dvh), 330px);
-    --lnl-intro-title: clamp(40px, 13vw, 58px);
+  .lnl-intro-scene {
+    width: min(92vw, 430px);
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    justify-items: center;
+    gap: 6px;
+  }
+  .lnl-intro-globe {
+    grid-row: auto;
+    width: min(86vw, 44dvh, 380px);
+    justify-self: center;
+  }
+  .lnl-intro-copy {
+    width: 100%;
+    text-align: center;
+  }
+  .lnl-intro-copy > strong {
+    font-size: clamp(30px, 9.5vw, 44px);
+    line-height: 1.02;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+    word-break: break-word;
+  }
+  .lnl-intro-copy > span,
+  .lnl-intro-copy > p {
+    font-size: 7px;
+  }
+  .lnl-intro-telemetry {
+    width: min(100%, 360px);
+    margin-top: 7px;
+  }
+  .lnl-intro-globe-hud {
+    right: 2%;
+  }
+  .lnl-intro-globe-hud > span:last-child {
+    display: none;
+  }
+  .lnl-intro-telemetry div {
+    padding: 9px 7px;
   }
   .lnl-intro-top span:last-child,
   .lnl-intro-bottom span:last-child {
     display: none;
   }
-  .lnl-intro-top,
-  .lnl-intro-bottom {
-    font-size: 8px;
-  }
-  .lnl-intro-copy > span,
-  .lnl-intro-copy > p {
-    max-width: 290px;
-    font-size: 7px;
-    line-height: 1.6;
-  }
-  .lnl-intro-core > span {
-    width: 62px;
-    height: 62px;
-    padding: 6px;
-    border-radius: 16px;
-  }
-  .lnl-intro-core img {
-    border-radius: 10px;
-  }
-  .lnl-intro-node {
-    font-size: 7px;
-  }
-  .lnl-intro-progress {
-    right: 18px;
-    left: 18px;
-  }
-  .lnl-intro-skip {
-    right: 18px;
+  :global(.lnl-intro-exit-leave-to) .lnl-intro-globe {
+    opacity: 0.08;
+    transform: translate3d(0, -24vh, 0) scale(1.04);
   }
 }
+
 @media (orientation: landscape) and (max-height: 560px) {
   .lnl-intro-scene {
-    grid-template-columns: auto minmax(220px, 1fr);
-    align-items: center;
-    gap: 32px;
+    width: min(90vw, 820px);
+    grid-template-columns: minmax(250px, 0.9fr) minmax(250px, 1.1fr);
+    grid-template-rows: auto auto;
+  }
+  .lnl-intro-globe {
+    grid-row: 1 / 3;
+    width: min(45vw, 72dvh, 330px);
   }
   .lnl-intro-copy {
-    justify-items: start;
     text-align: left;
   }
-  .lnl-intro-copy > span,
-  .lnl-intro-copy > p {
-    max-width: 300px;
-  }
 }
+
 @media (prefers-reduced-motion: reduce) {
-  .lnl-intro::before,
   .lnl-intro-grid,
+  .lnl-intro-ocean,
   .lnl-intro-globe,
-  .route,
-  .lnl-intro-node,
   .lnl-intro-copy > *,
+  .lnl-intro-telemetry,
   .lnl-intro-progress i {
     animation: none !important;
     opacity: 1;
     transform: none;
   }
-  .lnl-intro-ocean,
   .phase-enter-active,
   .phase-leave-active {
-    animation: none !important;
-    transition: none !important;
-  }
-  .lnl-intro-node {
-    transform: translate(-50%, -50%);
+    transition: none;
   }
 }
 </style>

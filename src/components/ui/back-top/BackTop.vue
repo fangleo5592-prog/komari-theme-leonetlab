@@ -14,11 +14,19 @@ const emit = defineEmits<{
 }>()
 
 const show = ref(false)
+let scrollFrame = 0
 
 function handleScroll() {
-  const scrolled = window.scrollY > props.visibilityHeight
-  show.value = scrolled
-  emit('scrolled', scrolled)
+  if (scrollFrame)
+    return
+  scrollFrame = window.requestAnimationFrame(() => {
+    scrollFrame = 0
+    const scrolled = window.scrollY > props.visibilityHeight
+    if (show.value === scrolled)
+      return
+    show.value = scrolled
+    emit('scrolled', scrolled)
+  })
 }
 
 function scrollToTop() {
@@ -32,6 +40,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  if (scrollFrame)
+    window.cancelAnimationFrame(scrollFrame)
 })
 </script>
 
@@ -46,7 +56,7 @@ onUnmounted(() => {
   >
     <button
       v-show="show"
-      class="fixed bottom-8 right-8 z-[9999] size-10 rounded-full bg-background border shadow-sm flex items-center justify-center text-foreground hover:bg-accent transition-colors"
+      class="lnl-back-top fixed bottom-8 right-8 z-45 size-10 rounded-full bg-background border shadow-sm flex items-center justify-center text-foreground hover:bg-accent transition-colors"
       aria-label="返回顶部"
       @click="scrollToTop"
     >
